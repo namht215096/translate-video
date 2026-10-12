@@ -27,8 +27,13 @@ def main():
         "timings_ms": {},
         "note": "Stage timings exclude listening and ASR stabilization; these are not end-to-end latency.",
     }
-    for field in ["translation_queue_ms", "translation_ms", "tts_ms", "audio_queue_ms", "commit_to_audio_ready_ms"]:
-        values = [event[field] for event in segments]
+    # Read audio_queue_ms only for backward compatibility with historical logs.
+    for field in ["translation_queue_ms", "translation_ms", "tts_ms", "playback_ms",
+                  "commit_to_audio_ready_ms", "audio_queue_ms", "tts_first_chunk_ms",
+                  "tts_stream_elapsed_ms"]:
+        values = [event[field] for event in segments if field in event]
+        if not values:
+            continue
         report["timings_ms"][field] = {"p50": round(percentile(values, 0.5), 2),
                                          "p95": round(percentile(values, 0.95), 2)}
     asr_calls = [event["asr_call_ms"] for event in events if event["type"] == "partial"]
@@ -39,8 +44,10 @@ def main():
         }
     if summaries:
         report["run"] = summaries[-1]
-    if "audio_ready_elapsed_seconds" in segments[0]:
-        report["first_audio_ready_seconds_from_input_start"] = round(segments[0]["audio_ready_elapsed_seconds"], 3)
+    first = segments[0].get("first_audio_ready_elapsed_seconds",
+                            segments[0].get("audio_ready_elapsed_seconds"))
+    if first is not None:
+        report["first_audio_ready_seconds_from_input_start"] = round(first, 3)
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 

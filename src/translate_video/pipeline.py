@@ -1,4 +1,4 @@
-"""Streaming ASR producer with independent translation and audio workers."""
+"""Streaming ASR with one worker for translation, TTS, and direct playback."""
 
 from dataclasses import dataclass
 import json
@@ -6,10 +6,9 @@ from pathlib import Path
 import queue
 import threading
 import time
-import wave
 
 from .segmentation import Segmenter
-from .audio import WavePlayer
+from .audio import AudioPlayer
 
 
 @dataclass
@@ -27,14 +26,13 @@ class Pipeline:
         self.asr, self.translator, self.tts = asr, translator, tts
         self.output = output
         self.play = play
-        self.player = WavePlayer() if play else None
+        self.player = AudioPlayer() if play else None
         self.silence_seconds = silence_seconds
         self.max_window_seconds = max_window_seconds
         self.rms_threshold = rms_threshold
         self.final_only = final_only
         self.metadata = metadata or {}
         self.text_queue = queue.Queue(maxsize=32)
-        self.audio_queue = queue.Queue(maxsize=32)
         self.errors = queue.Queue()
         self.stopped = threading.Event()
         self.log_lock = threading.Lock()
@@ -72,19 +70,60 @@ class Pipeline:
 
     def translate_worker(self):
         try:
+            if self.player:
+                print(f"Playback backend: {self.player.name} (in-memory PCM)", flush=True)
             while not self.stopped.is_set():
                 try:
                     segment = self.text_queue.get(timeout=0.1)
                 except queue.Empty:
                     continue
                 if segment is None:
-                    self.put(self.audio_queue, None)
                     return
                 started = time.monotonic()
                 translation = self.translator.translate(segment.text)
                 translated = time.monotonic()
-                audio = self.tts.synthesize(translation)
-                ready = time.monotonic()
+                streaming = hasattr(self.tts, "synthesize_stream")
+                stream_times = {}
+                if streaming:
+                    samples = 0
+
+                    def measured_chunks():
+                        nonlocal samples
+                        import numpy as np
+
+                        chunks = self.tts.synthesize_stream(translation)
+                        try:
+                            for chunk in chunks:
+                                chunk = np.asarray(chunk, dtype=np.float32)
+                                if chunk.ndim != 1 or not np.isfinite(chunk).all():
+                                    raise ValueError("TTS returned an invalid mono waveform")
+                                if not len(chunk):
+                                    continue
+                                now = time.monotonic()
+                                stream_times.setdefault("first", now)
+                                stream_times["last"] = now
+                                samples += len(chunk)
+                                yield chunk
+                        finally:
+                            close = getattr(chunks, "close", None)
+                            if close:
+                                close()
+
+                    playback_started = time.monotonic()
+                    if self.player:
+                        self.player.play_stream(measured_chunks(), self.tts.sample_rate)
+                    else:
+                        for _ in measured_chunks():
+                            pass
+                    playback_finished = time.monotonic()
+                    if not samples:
+                        raise RuntimeError("TTS returned no audio")
+                    ready = stream_times["last"]
+                    audio_seconds = samples / self.tts.sample_rate
+                else:
+                    audio = self.tts.synthesize(translation)
+                    ready = time.monotonic()
+                    audio_seconds = len(audio) / self.tts.sample_rate
                 event = {
                     "type": "segment", "index": segment.index,
                     "source": segment.text, "translation": translation,
@@ -93,44 +132,27 @@ class Pipeline:
                     "audio_ready_elapsed_seconds": ready - self.started_at,
                     "translation_queue_ms": (started - segment.committed_at) * 1000,
                     "translation_ms": (translated - started) * 1000,
-                    "tts_ms": (ready - translated) * 1000,
-                    "audio_seconds": len(audio) / self.tts.sample_rate,
+                    "audio_seconds": audio_seconds,
                     "commit_to_audio_ready_ms": (ready - segment.committed_at) * 1000,
                 }
-                self.put(self.audio_queue, (audio, event, ready))
-        except BaseException as exc:
-            self.errors.put(exc)
-            self.stopped.set()
-
-    def audio_worker(self):
-        import numpy as np
-        import soundfile as sf
-
-        try:
-            if self.player:
-                print(f"Playback backend: {self.player.name}", flush=True)
-            with wave.open(str(self.output / "translated.wav"), "wb") as combined:
-                combined.setnchannels(1)
-                combined.setsampwidth(2)
-                combined.setframerate(self.tts.sample_rate)
-                while not self.stopped.is_set():
-                    try:
-                        item = self.audio_queue.get(timeout=0.1)
-                    except queue.Empty:
-                        continue
-                    if item is None:
-                        return
-                    audio, event, ready = item
-                    segment_path = self.output / f"segment-{event['index']:04d}.wav"
-                    sf.write(segment_path, audio, self.tts.sample_rate)
-                    pcm = (np.clip(audio, -1, 1) * 32767).astype("<i2")
-                    combined.writeframes(pcm.tobytes())
-                    event["audio_queue_ms"] = (time.monotonic() - ready) * 1000
-                    event["audio_sink_elapsed_seconds"] = time.monotonic() - self.started_at
-                    self.log(event)
-                    print(f"[{event['index']}] {event['source']}\n  -> {event['translation']}", flush=True)
+                if streaming:
+                    event.update({
+                        "tts_first_chunk_ms": (stream_times["first"] - translated) * 1000,
+                        "first_audio_ready_elapsed_seconds": stream_times["first"] - self.started_at,
+                        "tts_stream_elapsed_ms": (ready - translated) * 1000,
+                    })
                     if self.player:
-                        self.player.play(segment_path)
+                        event["playback_submit_elapsed_seconds"] = playback_started - self.started_at
+                        event["playback_ms"] = (playback_finished - playback_started) * 1000
+                else:
+                    event["tts_ms"] = (ready - translated) * 1000
+                print(f"[{event['index']}] {event['source']}\n  -> {event['translation']}", flush=True)
+                if self.player and not streaming:
+                    playback_started = time.monotonic()
+                    event["playback_submit_elapsed_seconds"] = playback_started - self.started_at
+                    self.player.play(audio, self.tts.sample_rate)
+                    event["playback_ms"] = (time.monotonic() - playback_started) * 1000
+                self.log(event)
         except BaseException as exc:
             self.errors.put(exc)
             self.stopped.set()
@@ -146,9 +168,8 @@ class Pipeline:
         started = time.monotonic()
         self.started_at = started
         with (self.output / "events.jsonl").open("w", encoding="utf-8") as self.log_file:
-            workers = [threading.Thread(target=self.translate_worker), threading.Thread(target=self.audio_worker)]
-            for worker in workers:
-                worker.start()
+            worker = threading.Thread(target=self.translate_worker)
+            worker.start()
             segmenter = Segmenter()
             window = silence = 0.0
             active = False
@@ -190,13 +211,11 @@ class Pipeline:
                     interrupted = True
                 finish_window()
                 self.put(self.text_queue, None)
-                for worker in workers:
-                    worker.join()
+                worker.join()
                 self.check()
                 self.log({"type": "summary", "segments": self.index,
                           "source_seconds": end, "wall_seconds": time.monotonic() - started,
                           "interrupted": interrupted})
             finally:
                 self.stopped.set()
-                for worker in workers:
-                    worker.join()
+                worker.join()

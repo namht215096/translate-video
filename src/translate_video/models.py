@@ -99,3 +99,33 @@ class MMSTTS:
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         with self.torch.inference_mode():
             return self.model(**inputs).waveform[0].cpu().numpy()
+
+
+class VieNeuTTS:
+    """Vietnamese 48 kHz TTS with incremental waveform output."""
+
+    def __init__(self, model_id: str, device: str, voice=None):
+        from vieneu import Vieneu
+
+        self.model = Vieneu(
+            backbone_repo=model_id, device=device,
+            backend="pytorch" if device.startswith("cuda") else "onnx",
+            max_streams=1, max_batch_size=1,
+        )
+        self.sample_rate = self.model.sample_rate
+        self.voice = voice
+
+    def synthesize_stream(self, text: str):
+        # No watermark extra or reference recording is required for preset voices.
+        return self.model.infer_stream(text, voice=self.voice, apply_watermark=False)
+
+    def synthesize(self, text: str):
+        import numpy as np
+
+        chunks = list(self.synthesize_stream(text))
+        if not chunks:
+            raise RuntimeError("VieNeu returned no audio")
+        return np.concatenate(chunks)
+
+    def close(self):
+        self.model.close()

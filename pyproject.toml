@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "translate-video"
-version = "0.1.0"
+version = "0.0.2"
 description = "Experimental streaming speech translation in Python"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -17,6 +17,7 @@ dependencies = [
 dev = ["pytest>=8,<10"]
 compiler = ["ziglang==0.13.0"]
 plot = ["matplotlib>=3.10,<4"]
+vieneu = ["vieneu==3.8.3"]
 
 [project.scripts]
 translate-video = "translate_video.cli:main"

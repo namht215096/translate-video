@@ -15,12 +15,14 @@ def parser():
     result.add_argument("--mic-device", help="PortAudio input device name")
     result.add_argument("--realtime", action="store_true", help="Pace file input according to its audio clock")
     result.add_argument("--play", action="store_true", help="Play translated speech through the default output device")
-    result.add_argument("--output", type=Path, required=True, help="New output directory (must not already exist)")
+    result.add_argument("--output", type=Path, required=True, help="New directory for JSON logs and configuration; audio is not saved")
     result.add_argument("--asr-model", default="Qwen/Qwen3-ASR-1.7B")
     result.add_argument("--source-language", default="English")
     result.add_argument("--source-code", default="eng_Latn", help="NLLB source language code")
     result.add_argument("--target-code", default="vie_Latn", help="NLLB target language code")
-    result.add_argument("--tts-model", default="facebook/mms-tts-vie")
+    result.add_argument("--tts-backend", choices=["vieneu", "mms"], default="vieneu")
+    result.add_argument("--tts-model", help="Override the checkpoint for the selected TTS backend")
+    result.add_argument("--tts-voice", help="VieNeu preset voice; omitted uses the SDK default")
     result.add_argument("--model-device", default="cuda:0", help="Device for NLLB and TTS; ASR requires CUDA")
     result.add_argument("--gpu-memory-utilization", type=float, default=0.55)
     result.add_argument("--chunk-seconds", type=float, default=1.0)
@@ -34,6 +36,10 @@ def parser():
 def main():
     arguments = parser()
     args = arguments.parse_args()
+    args.tts_model = args.tts_model or (
+        "pnnbao-ump/VieNeu-TTS-v3-Turbo" if args.tts_backend == "vieneu"
+        else "facebook/mms-tts-vie"
+    )
     if args.output.exists():
         arguments.error("--output already exists; choose a new directory")
     if args.input and not args.input.is_file():
@@ -50,7 +56,7 @@ def main():
         import torch
         from importlib.metadata import version
         from .audio import file_chunks, microphone_chunks
-        from .models import MMSTTS, NLLBTranslator, QwenASR
+        from .models import MMSTTS, VieNeuTTS, NLLBTranslator, QwenASR
         from .pipeline import Pipeline
 
         torch.set_num_threads(2)
@@ -60,20 +66,30 @@ def main():
             raise RuntimeError("A C compiler is required by Triton. Install GCC or use the optional Zig compiler described in README.md")
         print("Loading Qwen ASR...", flush=True)
         asr = QwenASR(args.asr_model, args.source_language, args.chunk_seconds, args.gpu_memory_utilization)
-        print("Loading NLLB and MMS TTS...", flush=True)
+        print(f"Loading NLLB and {args.tts_backend} TTS...", flush=True)
         translator = NLLBTranslator(args.source_code, args.target_code, args.model_device)
-        tts = MMSTTS(args.tts_model, args.model_device)
+        tts = (VieNeuTTS(args.tts_model, args.model_device, args.tts_voice)
+               if args.tts_backend == "vieneu" else MMSTTS(args.tts_model, args.model_device))
         chunks = (microphone_chunks(args.mic_device) if args.mic
                   else file_chunks(args.input, realtime=args.realtime))
-        Pipeline(
+        pipeline = Pipeline(
             asr, translator, tts, args.output, play=args.play,
             silence_seconds=args.silence_seconds,
             max_window_seconds=args.max_window_seconds,
             rms_threshold=args.rms_threshold, final_only=args.final_only,
             metadata={"arguments": vars(args), "packages": {
                 name: version(name) for name in ["qwen-asr", "vllm", "torch", "transformers"]
-            }, "gpu": torch.cuda.get_device_name(0)},
-        ).run(chunks)
+                + (["vieneu", "sea-g2p"] if args.tts_backend == "vieneu" else [])
+            }, "gpu": torch.cuda.get_device_name(0), "tts": {
+                "sample_rate": tts.sample_rate,
+                "voice": args.tts_voice or getattr(tts.model, "_default_voice", None),
+            }},
+        )
+        try:
+            pipeline.run(chunks)
+        finally:
+            if hasattr(tts, "close"):
+                tts.close()
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

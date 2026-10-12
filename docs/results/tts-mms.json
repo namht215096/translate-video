@@ -1,0 +1,468 @@
+{
+  "backend": "mms",
+  "model": "facebook/mms-tts-vie",
+  "device": "cuda:0",
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER",
+  "sample_rate": 16000,
+  "voice": null,
+  "max_streams": null,
+  "load_ms": 3021.015210000769,
+  "cold_request": {
+    "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+    "seed": 42,
+    "first_audio_ms": 517.656514999544,
+    "total_ms": 517.6861079999071,
+    "audio_seconds": 4.048,
+    "rtf": 0.12788688438732884,
+    "chunks": 1
+  },
+  "warmups": 3,
+  "repeats": 5,
+  "revisions": {
+    "facebook/mms-tts-vie": "b58928d033932a49aa8e3d6cf11625b25fe928d2"
+  },
+  "packages": {
+    "torch": "2.9.1",
+    "transformers": "4.57.6",
+    "vieneu": "3.8.3",
+    "sea-g2p": "0.10.0",
+    "onnxruntime": "1.31.0"
+  },
+  "summary": {
+    "first_audio_ms": {
+      "p50": 40.44050100037566,
+      "p95": 58.06906999896455
+    },
+    "total_ms": {
+      "p50": 40.469941000083054,
+      "p95": 58.107486000153585
+    },
+    "audio_seconds": {
+      "p50": 4.264,
+      "p95": 14.784
+    },
+    "rtf": {
+      "p50": 0.00876639089184244,
+      "p95": 0.036578336348432126
+    }
+  },
+  "per_text": [
+    {
+      "text": "Xin chào.",
+      "first_audio_ms": {
+        "p50": 41.132514999844716,
+        "p95": 44.45098299947858
+      },
+      "total_ms": {
+        "p50": 41.18774999915331,
+        "p95": 44.47925699969346
+      },
+      "audio_seconds": {
+        "p50": 1.232,
+        "p95": 1.312
+      },
+      "rtf": {
+        "p50": 0.03163151388805461,
+        "p95": 0.036578336348432126
+      }
+    },
+    {
+      "text": "Ồ, đúng rồi.",
+      "first_audio_ms": {
+        "p50": 40.406480999081396,
+        "p95": 44.332502999168355
+      },
+      "total_ms": {
+        "p50": 40.4335519997403,
+        "p95": 44.35978900073678
+      },
+      "audio_seconds": {
+        "p50": 1.168,
+        "p95": 1.264
+      },
+      "rtf": {
+        "p50": 0.03528055565124778,
+        "p95": 0.04138040018725446
+      }
+    },
+    {
+      "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+      "first_audio_ms": {
+        "p50": 39.46415199970943,
+        "p95": 40.2950059997238
+      },
+      "total_ms": {
+        "p50": 39.497096000559395,
+        "p95": 40.324166000573314
+      },
+      "audio_seconds": {
+        "p50": 3.808,
+        "p95": 4.08
+      },
+      "rtf": {
+        "p50": 0.010298371848933154,
+        "p95": 0.011201157222381476
+      }
+    },
+    {
+      "text": "Anh ta thậm chí còn không lớn đến thế khi tôi bắt đầu lắng nghe anh ta,",
+      "first_audio_ms": {
+        "p50": 40.47452100166993,
+        "p95": 43.634954001390724
+      },
+      "total_ms": {
+        "p50": 40.506330000425805,
+        "p95": 43.67082600037975
+      },
+      "audio_seconds": {
+        "p50": 6.208,
+        "p95": 6.8
+      },
+      "rtf": {
+        "p50": 0.006491797283908444,
+        "p95": 0.007052781976805514
+      }
+    },
+    {
+      "text": "nhưng và âm nhạc solo của anh ấy không làm quá nhiều.",
+      "first_audio_ms": {
+        "p50": 40.236135999293765,
+        "p95": 44.58420899936755
+      },
+      "total_ms": {
+        "p50": 40.264648998345365,
+        "p95": 44.61383199850388
+      },
+      "audio_seconds": {
+        "p50": 4.912,
+        "p95": 5.984
+      },
+      "rtf": {
+        "p50": 0.00789292833883263,
+        "p95": 0.00905230418128268
+      }
+    },
+    {
+      "text": "Đây là hệ thống dịch giọng nói từ tiếng Anh sang tiếng Việt trong thời gian thực. Âm thanh được nhận dạng, dịch thành văn bản và đọc bằng giọng nói tổng hợp để người nghe có thể theo dõi nội dung.",
+      "first_audio_ms": {
+        "p50": 57.53075000029639,
+        "p95": 69.36755599963362
+      },
+      "total_ms": {
+        "p50": 57.566741001210175,
+        "p95": 69.40646899965941
+      },
+      "audio_seconds": {
+        "p50": 14.528,
+        "p95": 15.168
+      },
+      "rtf": {
+        "p50": 0.003967871597170516,
+        "p95": 0.004575848430884719
+      }
+    }
+  ],
+  "measurements": [
+    {
+      "text": "Ồ, đúng rồi.",
+      "seed": 1000,
+      "first_audio_ms": 44.332502999168355,
+      "total_ms": 44.35978900073678,
+      "audio_seconds": 1.072,
+      "rtf": 0.04138040018725446,
+      "chunks": 1,
+      "text_index": 1
+    },
+    {
+      "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+      "seed": 1001,
+      "first_audio_ms": 39.90720399997372,
+      "total_ms": 39.93619099856005,
+      "audio_seconds": 3.76,
+      "rtf": 0.010621327393234056,
+      "chunks": 1,
+      "text_index": 2
+    },
+    {
+      "text": "nhưng và âm nhạc solo của anh ấy không làm quá nhiều.",
+      "seed": 1002,
+      "first_audio_ms": 44.58420899936755,
+      "total_ms": 44.61383199850388,
+      "audio_seconds": 5.984,
+      "rtf": 0.007455520053225916,
+      "chunks": 1,
+      "text_index": 4
+    },
+    {
+      "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+      "seed": 1003,
+      "first_audio_ms": 39.18805700050143,
+      "total_ms": 39.216200000737444,
+      "audio_seconds": 3.808,
+      "rtf": 0.010298371848933154,
+      "chunks": 1,
+      "text_index": 2
+    },
+    {
+      "text": "nhưng và âm nhạc solo của anh ấy không làm quá nhiều.",
+      "seed": 1004,
+      "first_audio_ms": 38.742434000596404,
+      "total_ms": 38.77006400034588,
+      "audio_seconds": 4.912,
+      "rtf": 0.00789292833883263,
+      "chunks": 1,
+      "text_index": 4
+    },
+    {
+      "text": "Xin chào.",
+      "seed": 1005,
+      "first_audio_ms": 44.45098299947858,
+      "total_ms": 44.47925699969346,
+      "audio_seconds": 1.216,
+      "rtf": 0.036578336348432126,
+      "chunks": 1,
+      "text_index": 0
+    },
+    {
+      "text": "Đây là hệ thống dịch giọng nói từ tiếng Anh sang tiếng Việt trong thời gian thực. Âm thanh được nhận dạng, dịch thành văn bản và đọc bằng giọng nói tổng hợp để người nghe có thể theo dõi nội dung.",
+      "seed": 1006,
+      "first_audio_ms": 69.36755599963362,
+      "total_ms": 69.40646899965941,
+      "audio_seconds": 15.168,
+      "rtf": 0.004575848430884719,
+      "chunks": 1,
+      "text_index": 5
+    },
+    {
+      "text": "Xin chào.",
+      "seed": 1007,
+      "first_audio_ms": 14.92340000004333,
+      "total_ms": 14.943423000659095,
+      "audio_seconds": 1.216,
+      "rtf": 0.012288999178173598,
+      "chunks": 1,
+      "text_index": 0
+    },
+    {
+      "text": "Đây là hệ thống dịch giọng nói từ tiếng Anh sang tiếng Việt trong thời gian thực. Âm thanh được nhận dạng, dịch thành văn bản và đọc bằng giọng nói tổng hợp để người nghe có thể theo dõi nội dung.",
+      "seed": 1008,
+      "first_audio_ms": 57.08941199918627,
+      "total_ms": 57.13735099925543,
+      "audio_seconds": 14.4,
+      "rtf": 0.003967871597170516,
+      "chunks": 1,
+      "text_index": 5
+    },
+    {
+      "text": "Anh ta thậm chí còn không lớn đến thế khi tôi bắt đầu lắng nghe anh ta,",
+      "seed": 1009,
+      "first_audio_ms": 43.634954001390724,
+      "total_ms": 43.67082600037975,
+      "audio_seconds": 6.192,
+      "rtf": 0.007052781976805514,
+      "chunks": 1,
+      "text_index": 3
+    },
+    {
+      "text": "Anh ta thậm chí còn không lớn đến thế khi tôi bắt đầu lắng nghe anh ta,",
+      "seed": 1010,
+      "first_audio_ms": 39.65051799968933,
+      "total_ms": 39.67786499924841,
+      "audio_seconds": 6.112,
+      "rtf": 0.006491797283908444,
+      "chunks": 1,
+      "text_index": 3
+    },
+    {
+      "text": "Ồ, đúng rồi.",
+      "seed": 1011,
+      "first_audio_ms": 41.18125700006203,
+      "total_ms": 41.20768900065741,
+      "audio_seconds": 1.168,
+      "rtf": 0.03528055565124778,
+      "chunks": 1,
+      "text_index": 1
+    },
+    {
+      "text": "Đây là hệ thống dịch giọng nói từ tiếng Anh sang tiếng Việt trong thời gian thực. Âm thanh được nhận dạng, dịch thành văn bản và đọc bằng giọng nói tổng hợp để người nghe có thể theo dõi nội dung.",
+      "seed": 1012,
+      "first_audio_ms": 57.53075000029639,
+      "total_ms": 57.566741001210175,
+      "audio_seconds": 14.784,
+      "rtf": 0.0038938542343892163,
+      "chunks": 1,
+      "text_index": 5
+    },
+    {
+      "text": "Anh ta thậm chí còn không lớn đến thế khi tôi bắt đầu lắng nghe anh ta,",
+      "seed": 1013,
+      "first_audio_ms": 40.57619800005341,
+      "total_ms": 40.60777999984566,
+      "audio_seconds": 6.208,
+      "rtf": 0.0065412016752328704,
+      "chunks": 1,
+      "text_index": 3
+    },
+    {
+      "text": "nhưng và âm nhạc solo của anh ấy không làm quá nhiều.",
+      "seed": 1014,
+      "first_audio_ms": 40.34671500085096,
+      "total_ms": 40.375349000896676,
+      "audio_seconds": 5.216,
+      "rtf": 0.00774067273790197,
+      "chunks": 1,
+      "text_index": 4
+    },
+    {
+      "text": "Anh ta thậm chí còn không lớn đến thế khi tôi bắt đầu lắng nghe anh ta,",
+      "seed": 1015,
+      "first_audio_ms": 40.374466001594556,
+      "total_ms": 40.404072000455926,
+      "audio_seconds": 6.8,
+      "rtf": 0.0059417752941846955,
+      "chunks": 1,
+      "text_index": 3
+    },
+    {
+      "text": "Ồ, đúng rồi.",
+      "seed": 1016,
+      "first_audio_ms": 40.26006700041762,
+      "total_ms": 40.28677499991318,
+      "audio_seconds": 1.12,
+      "rtf": 0.03597033482135105,
+      "chunks": 1,
+      "text_index": 1
+    },
+    {
+      "text": "Ồ, đúng rồi.",
+      "seed": 1017,
+      "first_audio_ms": 40.406480999081396,
+      "total_ms": 40.4335519997403,
+      "audio_seconds": 1.264,
+      "rtf": 0.03198856962004771,
+      "chunks": 1,
+      "text_index": 1
+    },
+    {
+      "text": "Xin chào.",
+      "seed": 1018,
+      "first_audio_ms": 41.132514999844716,
+      "total_ms": 41.18774999915331,
+      "audio_seconds": 1.312,
+      "rtf": 0.031393102133501,
+      "chunks": 1,
+      "text_index": 0
+    },
+    {
+      "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+      "seed": 1019,
+      "first_audio_ms": 21.487907999471645,
+      "total_ms": 21.514564999961294,
+      "audio_seconds": 3.808,
+      "rtf": 0.005649833245788155,
+      "chunks": 1,
+      "text_index": 2
+    },
+    {
+      "text": "Đây là hệ thống dịch giọng nói từ tiếng Anh sang tiếng Việt trong thời gian thực. Âm thanh được nhận dạng, dịch thành văn bản và đọc bằng giọng nói tổng hợp để người nghe có thể theo dõi nội dung.",
+      "seed": 1020,
+      "first_audio_ms": 58.06906999896455,
+      "total_ms": 58.107486000153585,
+      "audio_seconds": 14.528,
+      "rtf": 0.003999689289658149,
+      "chunks": 1,
+      "text_index": 5
+    },
+    {
+      "text": "nhưng và âm nhạc solo của anh ấy không làm quá nhiều.",
+      "seed": 1021,
+      "first_audio_ms": 39.725503000227036,
+      "total_ms": 39.75647900006152,
+      "audio_seconds": 4.688,
+      "rtf": 0.008480477602402201,
+      "chunks": 1,
+      "text_index": 4
+    },
+    {
+      "text": "nhưng và âm nhạc solo của anh ấy không làm quá nhiều.",
+      "seed": 1022,
+      "first_audio_ms": 40.236135999293765,
+      "total_ms": 40.264648998345365,
+      "audio_seconds": 4.448,
+      "rtf": 0.00905230418128268,
+      "chunks": 1,
+      "text_index": 4
+    },
+    {
+      "text": "Xin chào.",
+      "seed": 1023,
+      "first_audio_ms": 41.19224900023255,
+      "total_ms": 41.21874399970693,
+      "audio_seconds": 1.232,
+      "rtf": 0.033456772727034845,
+      "chunks": 1,
+      "text_index": 0
+    },
+    {
+      "text": "Ồ, đúng rồi.",
+      "seed": 1024,
+      "first_audio_ms": 14.400326001123176,
+      "total_ms": 14.421621001019957,
+      "audio_seconds": 1.232,
+      "rtf": 0.01170586120212659,
+      "chunks": 1,
+      "text_index": 1
+    },
+    {
+      "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+      "seed": 1025,
+      "first_audio_ms": 39.46415199970943,
+      "total_ms": 39.497096000559395,
+      "audio_seconds": 4.08,
+      "rtf": 0.009680660784450831,
+      "chunks": 1,
+      "text_index": 2
+    },
+    {
+      "text": "Đây là hệ thống dịch giọng nói từ tiếng Anh sang tiếng Việt trong thời gian thực. Âm thanh được nhận dạng, dịch thành văn bản và đọc bằng giọng nói tổng hợp để người nghe có thể theo dõi nội dung.",
+      "seed": 1026,
+      "first_audio_ms": 53.89762300001166,
+      "total_ms": 53.93807899963576,
+      "audio_seconds": 13.872,
+      "rtf": 0.003888269824079856,
+      "chunks": 1,
+      "text_index": 5
+    },
+    {
+      "text": "Xin chào.",
+      "seed": 1027,
+      "first_audio_ms": 40.968195999084855,
+      "total_ms": 40.994441998918774,
+      "audio_seconds": 1.296,
+      "rtf": 0.03163151388805461,
+      "chunks": 1,
+      "text_index": 0
+    },
+    {
+      "text": "Anh ta thậm chí còn không lớn đến thế khi tôi bắt đầu lắng nghe anh ta,",
+      "seed": 1028,
+      "first_audio_ms": 40.47452100166993,
+      "total_ms": 40.506330000425805,
+      "audio_seconds": 6.704,
+      "rtf": 0.006042113663548002,
+      "chunks": 1,
+      "text_index": 3
+    },
+    {
+      "text": "Hôm nay trời đẹp, chúng ta cùng đi dạo nhé.",
+      "seed": 1029,
+      "first_audio_ms": 40.2950059997238,
+      "total_ms": 40.324166000573314,
+      "audio_seconds": 3.6,
+      "rtf": 0.011201157222381476,
+      "chunks": 1,
+      "text_index": 2
+    }
+  ],
+  "method": "Sequential requests, seed matched by request, 2 CPU threads, CUDA synchronized at boundaries, no playback, no ASR/MT, no audio saved. MMS first audio is its entire waveform; VieNeu uses infer_stream with watermark disabled. Different native rates and generated durations; no quality scoring."
+}

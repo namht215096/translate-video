@@ -12,6 +12,12 @@ High throughput and low latency are different. Synthesizing a four-second audio
 clip in 100 ms is fast inference, but playing that clip still takes four seconds.
 The system remains useful only if inference and playback backlogs stay bounded.
 
+The current implementation keeps one text queue and uses a single worker for
+translation, TTS, and blocking playback. It plays each waveform directly from
+memory and then processes the next text segment. Removing the audio queue does
+not remove playback delay: pending work can accumulate in the text queue. Only
+JSON logs and configuration are saved.
+
 ## ASR choice
 
 Start with Qwen3-ASR-1.7B because it was the requested first candidate. Its
@@ -82,6 +88,13 @@ VITS model. It generates whole audio segments and uses a fixed voice. It is not
 FastSpeech 2, voice cloning, or streaming waveform generation.
 
 [MMS Vietnamese model card](https://huggingface.co/facebook/mms-tts-vie)
+
+The current default is now VieNeu-TTS-v3-Turbo through SDK 3.8.3. It emits
+48 kHz waveform chunks and replaces the complete TTS block, including audio
+decoding; an external FastSpeech 2 vocoder is not needed. MMS remains available
+through `--tts-backend mms`. Local measurements show slightly lower first-audio
+latency for VieNeu, but much faster complete synthesis for MMS. See
+[the matched-text benchmark](tts-benchmark.md) for data and limitations.
 
 ## Evaluation procedure
 

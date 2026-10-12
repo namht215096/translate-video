@@ -1,0 +1,44 @@
+{
+  "completed": true,
+  "segments": 5,
+  "generated_audio_seconds": 8.24,
+  "timings_ms": {
+    "translation_queue_ms": {
+      "p50": 1067.37,
+      "p95": 2210.53
+    },
+    "translation_ms": {
+      "p50": 72.93,
+      "p95": 176.95
+    },
+    "playback_ms": {
+      "p50": 1025.77,
+      "p95": 3554.4
+    },
+    "commit_to_audio_ready_ms": {
+      "p50": 2327.1,
+      "p95": 3028.74
+    },
+    "tts_first_chunk_ms": {
+      "p50": 43.41,
+      "p95": 322.33
+    },
+    "tts_stream_elapsed_ms": {
+      "p50": 425.5,
+      "p95": 2529.28
+    },
+    "asr_call_ms": {
+      "p50": 102.54,
+      "p95": 281.1
+    }
+  },
+  "note": "Stage timings exclude listening and ASR stabilization; these are not end-to-end latency.",
+  "run": {
+    "type": "summary",
+    "segments": 5,
+    "source_seconds": 10.0,
+    "wall_seconds": 13.890038538000226,
+    "interrupted": false
+  },
+  "first_audio_ready_seconds_from_input_start": 4.029
+}

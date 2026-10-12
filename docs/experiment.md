@@ -1,5 +1,10 @@
 # Local experiment report
 
+The initial measurements below describe the earlier implementation with an audio queue
+and WAV output. The current implementation has removed both features: it plays
+audio directly from memory and saves only JSON logs and configuration. Retained
+result files are historical records, not benchmarks of the current architecture.
+
 The Python pipeline completed a real **English → Vietnamese** file-replay run
 on 2026-10-12. All three model stages ran locally: Qwen3-ASR-1.7B through vLLM,
 NLLB-600M, and Vietnamese MMS-TTS. The final run used stable-prefix commits and
@@ -130,3 +135,26 @@ Results are in [playback-10s.json](results/playback-10s.json), and the local out
 is in `output/live-10s-verified/`. This verifies successful player execution;
 physical speaker latency and microphone capture remain unmeasured. The prepared
 input is an excerpt ending mid-sentence, so its final translation is incomplete.
+
+## Direct playback after removing audio storage
+
+The later VieNeu integration and matched-text comparison are documented in
+[the TTS benchmark](tts-benchmark.md), including a successful real-time playback
+run with the same English excerpt. The MMS results below remain historical.
+
+The MMS pipeline was tested again with the ten-second excerpt and
+`--realtime --play`, after removing the audio queue and WAV saving. Five segments
+were played successfully by passing raw PCM from memory to PipeWire stdin.
+The run directory contained exactly `events.jsonl` and `configuration.json`.
+
+First waveform availability was 4.175 seconds after input processing began;
+the run completed in 18.798 seconds including blocking playback. The generated
+speech duration was 13.520 seconds. These are single-run observations, excluding
+model startup, and do not measure physical speaker latency.
+
+Translation, synthesis, and playback now run sequentially in one worker. Median
+text-queue wait was 1776.15 ms in this sample: pending work remains in the text
+queue while a segment plays. Removing the audio queue does not eliminate delay.
+Results are recorded in [direct-playback.json](results/direct-playback.json).
+Sixteen automated tests passed, including direct playback order, error
+propagation, raw PCM transfer, and checks that no audio files are created.
