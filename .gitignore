@@ -205,6 +205,11 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Local tools, model cache and generated experiment outputs
+.tools/
+output/
+examples/*.wav
+
 # Ruff stuff:
 .ruff_cache/
 

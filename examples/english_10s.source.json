@@ -1,0 +1,10 @@
+{
+  "source_url": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_en.wav",
+  "reference": "https://github.com/QwenLM/Qwen3-ASR/blob/main/examples/example_qwen3_asr_vllm_streaming.py",
+  "source_seconds": 15.051229166666667,
+  "clip_start_seconds": 0,
+  "clip_end_seconds": 10,
+  "sample_rate": 16000,
+  "channels": 1,
+  "description": "First 10 seconds of the public English example used by Qwen3-ASR; a conversational excerpt, not a complete scripted sentence."
+}

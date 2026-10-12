@@ -1,0 +1,39 @@
+{
+  "completed": true,
+  "segments": 7,
+  "generated_audio_seconds": 18.72,
+  "timings_ms": {
+    "translation_queue_ms": {
+      "p50": 598.38,
+      "p95": 1108.08
+    },
+    "translation_ms": {
+      "p50": 52.45,
+      "p95": 214.63
+    },
+    "tts_ms": {
+      "p50": 64.78,
+      "p95": 380.35
+    },
+    "audio_queue_ms": {
+      "p50": 1.97,
+      "p95": 4.32
+    },
+    "commit_to_audio_ready_ms": {
+      "p50": 712.97,
+      "p95": 1207.29
+    },
+    "asr_call_ms": {
+      "p50": 93.97,
+      "p95": 621.49
+    }
+  },
+  "note": "Stage timings exclude listening and ASR stabilization; these are not end-to-end latency.",
+  "run": {
+    "type": "summary",
+    "segments": 7,
+    "source_seconds": 15.05125,
+    "wall_seconds": 15.370012105000114,
+    "interrupted": false
+  }
+}

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "translate-video"
+version = "0.1.0"
+description = "Experimental streaming speech translation in Python"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "qwen-asr[vllm]==0.0.6",
+  "sentencepiece>=0.2,<0.3",
+  "sounddevice>=0.5,<0.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+compiler = ["ziglang==0.13.0"]
+plot = ["matplotlib>=3.10,<4"]
+
+[project.scripts]
+translate-video = "translate_video.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Use the optional local Zig compiler without installing a system compiler."""
+
+import os
+from pathlib import Path
+import sys
+
+python = Path(__file__).resolve().parents[1] / ".venv" / "bin" / "python"
+os.execv(str(python), [str(python), "-m", "ziglang", "cc", *sys.argv[1:]])

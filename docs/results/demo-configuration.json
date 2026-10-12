@@ -1,0 +1,29 @@
+{
+  "arguments": {
+    "input": "examples/asr_en.wav",
+    "mic": false,
+    "mic_device": null,
+    "realtime": true,
+    "play": false,
+    "output": "output/demo",
+    "asr_model": "Qwen/Qwen3-ASR-1.7B",
+    "source_language": "English",
+    "source_code": "eng_Latn",
+    "target_code": "vie_Latn",
+    "tts_model": "facebook/mms-tts-vie",
+    "model_device": "cuda:0",
+    "gpu_memory_utilization": 0.55,
+    "chunk_seconds": 1.0,
+    "silence_seconds": 0.6,
+    "max_window_seconds": 12.0,
+    "rms_threshold": 0.008,
+    "final_only": false
+  },
+  "packages": {
+    "qwen-asr": "0.0.6",
+    "vllm": "0.14.0",
+    "torch": "2.9.1",
+    "transformers": "4.57.6"
+  },
+  "gpu": "NVIDIA GeForce RTX 4070 SUPER"
+}
