@@ -384,3 +384,59 @@ def test_segments_that_are_already_vietnamese_are_skipped(tmp_path):
     events = [json.loads(line) for line in (output / "events.jsonl").read_text(encoding="utf-8").splitlines()]
     assert not [e for e in events if e["type"] == "segment"]
     assert [e["type"] for e in events if e["type"] == "skipped"]
+
+
+def test_a_failed_translation_ends_the_run_unless_errors_are_tolerated(tmp_path):
+    class Flaky(Translator):
+        def translate(self, text):
+            if text == "Hello,":
+                raise RuntimeError("Translation reached its token limit without completing")
+            return super().translate(text)
+
+    with pytest.raises(RuntimeError, match="token limit"):
+        Pipeline(ASR(), Flaky(), TTS(), tmp_path / "strict").run(loud(2))
+    output = tmp_path / "tolerant"
+    Pipeline(ASR(), Flaky(), TTS(), output, tolerate_errors=True).run(loud(2))
+    events = [json.loads(line) for line in (output / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [e["type"] for e in events].count("translation_failed") == 1
+    assert [e["source"] for e in events if e["type"] == "segment"] == ["world."]
+    assert events[-1]["type"] == "summary"
+
+
+def test_a_failed_tts_sentence_is_skipped_when_tolerated(tmp_path):
+    class FlakyTTS(TTS):
+        def synthesize(self, text):
+            if text == "Xin chào,":
+                raise RuntimeError("no audio")
+            return super().synthesize(text)
+
+    output = tmp_path / "tolerant"
+    Pipeline(ASR(), Translator(), FlakyTTS(), output, tolerate_errors=True).run(loud(2))
+    events = [json.loads(line) for line in (output / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [e["type"] for e in events].count("tts_failed") == 1
+    assert events[-1]["type"] == "summary"
+    with pytest.raises(RuntimeError, match="no audio"):
+        Pipeline(ASR(), Translator(), FlakyTTS(), tmp_path / "strict").run(loud(2))
+
+
+def test_chinese_windows_use_a_longer_silence_limit(tmp_path):
+    pipeline = Pipeline(ASR(), Translator(), TTS(), tmp_path / "run", silence_seconds=0.6, silence_seconds_cjk=1.0)
+    assert pipeline.silence_limit("so we begin") == 0.6
+    assert pipeline.silence_limit("所以今天这期视频我们不。") == 1.0
+    assert Pipeline(ASR(), Translator(), TTS(), tmp_path / "x", silence_seconds=0.6).silence_limit("你好") == 0.6
+
+
+def test_a_mid_sentence_pause_does_not_close_a_chinese_window(tmp_path):
+    class ChineseASR(ASR):
+        def feed(self, audio):
+            return "所以今天这期视频我们不", True
+
+    asr = ChineseASR()
+    quiet = (np.zeros(1600, dtype=np.float32), 0.0)
+    chunks = [(np.ones(1600, dtype=np.float32) * 0.1, 0.1)] + [(quiet[0], 0.1 * (i + 2)) for i in range(7)]
+    Pipeline(asr, Translator(), TTS(), tmp_path / "short", silence_seconds=0.6, silence_seconds_cjk=1.0,
+             on_revision="reset").run(chunks)
+    resets_with_cjk_limit = asr.resets
+    asr2 = ChineseASR()
+    Pipeline(asr2, Translator(), TTS(), tmp_path / "plain", silence_seconds=0.6, on_revision="reset").run(chunks)
+    assert resets_with_cjk_limit < asr2.resets          # 0.7 s of silence closes the window only with the 0.6 s limit

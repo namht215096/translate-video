@@ -76,9 +76,10 @@ def test_real_time_factor_is_far_below_one():
 
 def test_adaptive_speed_curve():
     assert adaptive_speed(0.0, 1.1, 1.4) == 1.1
-    assert adaptive_speed(1.5, 1.1, 1.4) == 1.1
+    assert adaptive_speed(1.0, 1.1, 1.4) == 1.1
+    assert adaptive_speed(3.5, 1.1, 1.4) == 1.4
     assert adaptive_speed(10.0, 1.1, 1.4) == 1.4
-    middle = adaptive_speed(3.75, 1.1, 1.4)
+    middle = adaptive_speed(2.25, 1.1, 1.4)
     assert 1.2 < middle < 1.3
     assert adaptive_speed(9.0, 1.1, 1.1) == 1.1                 # adaptation off
     values = [adaptive_speed(lag / 4, 1.1, 1.4) for lag in range(40)]

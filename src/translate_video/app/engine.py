@@ -24,6 +24,10 @@ class Settings:
     speed: float = 1.1            # base reading speed
     max_speed: float = 1.4        # reached when the listener falls behind
     segmentation: str = "punctuation"
+    speed_low_lag: float = 1.0    # delay (s) where speed starts to rise above `speed` ...
+    speed_high_lag: float = 3.5   # ... and where it reaches `max_speed`
+    source_language: str = "auto" # "auto" lets Qwen detect it; or a Qwen language name such as "English"/"Chinese"
+    silence_seconds_cjk: float = 1.0
     save_audio: bool = False
     tts_voice: str | None = None
     model_device: str = "cuda:0"
@@ -79,7 +83,7 @@ class Engine:
         seconds = {}
         mark = time.monotonic()
         self.send("loading", stage="asr", step=1, steps=3)
-        asr = QwenASR("Qwen/Qwen3-ASR-1.7B", "English", settings.chunk_seconds, settings.gpu_memory_utilization)
+        asr = QwenASR("Qwen/Qwen3-ASR-1.7B", None, settings.chunk_seconds, settings.gpu_memory_utilization)
         seconds["asr"] = time.monotonic() - mark
         mark = time.monotonic()
         self.send("loading", stage="nllb", step=2, steps=3)
@@ -171,6 +175,8 @@ class Session:
                 send("status", state="calibrating", device=system.device_name)
                 lag = system.calibrate()
                 send("calibration", lag_ms=lag, device=system.device_name)
+                # Forcing "English" on a Chinese video makes Qwen invent English words; "auto" detects the language.
+                models["asr"].set_language(None if settings.source_language == "auto" else settings.source_language)
                 models["asr"].reset()
                 output = self.engine.root / "output" / datetime.now().strftime("app-%Y%m%d-%H%M%S")
                 pipeline = self.pipeline = Pipeline(
@@ -178,6 +184,8 @@ class Session:
                     player=system.player, on_event=self.forward, stop_event=self.stop_event,
                     on_revision="reset", skip_source=looks_vietnamese,
                     speed=settings.speed, max_speed=settings.max_speed, segmentation=settings.segmentation,
+                    speed_low_lag=settings.speed_low_lag, speed_high_lag=settings.speed_high_lag,
+                    silence_seconds_cjk=settings.silence_seconds_cjk, tolerate_errors=True,
                     silence_seconds=settings.silence_seconds, max_window_seconds=settings.max_window_seconds,
                     rms_threshold=settings.rms_threshold, save_audio=settings.save_audio,
                     metadata={"arguments": {**asdict(settings), "app": True, "tts_backend": "vieneu", "realtime": True},

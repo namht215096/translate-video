@@ -56,8 +56,8 @@ class Pipeline:
                  rms_threshold=0.008, final_only=False, metadata=None, save_audio=False,
                  player=None, on_event=None, stop_event=None, on_revision="stop",
                  max_lag_seconds=None, skip_source=None,
-                 speed=1.0, max_speed=None, speed_low_lag=1.5, speed_high_lag=6.0,
-                 segmentation="punctuation"):
+                 speed=1.0, max_speed=None, speed_low_lag=1.0, speed_high_lag=3.5,
+                 segmentation="punctuation", silence_seconds_cjk=None, tolerate_errors=False):
         self.asr, self.translator, self.tts = asr, translator, tts
         self.output = output
         self.play = play
@@ -73,6 +73,8 @@ class Pipeline:
         self.speed_low_lag = speed_low_lag
         self.speed_high_lag = speed_high_lag
         self.segmentation = segmentation
+        self.silence_seconds_cjk = silence_seconds_cjk      # longer pause before closing a window of Chinese/Japanese
+        self.tolerate_errors = tolerate_errors              # live use: log a failed sentence and carry on
         self.silence_seconds = silence_seconds
         self.max_window_seconds = max_window_seconds
         self.rms_threshold = rms_threshold
@@ -154,6 +156,15 @@ class Pipeline:
                 remaining -= min(time.monotonic() - started, job.audio_seconds)
         return max(0.0, remaining)
 
+    def silence_limit(self, text: str) -> float:
+        """Seconds of silence that close the ASR window. Chinese speakers pause mid-sentence more often, and a
+        window closed there is flushed as a finished sentence ("我们不。"), so they get a longer limit."""
+        from .language import contains_cjk
+
+        if self.silence_seconds_cjk and contains_cjk(text):
+            return self.silence_seconds_cjk
+        return self.silence_seconds
+
     def choose_speed(self, lag_seconds):
         return adaptive_speed(lag_seconds, self.speed, self.max_speed, self.speed_low_lag, self.speed_high_lag)
 
@@ -179,7 +190,14 @@ class Pipeline:
                               "waited_ms": (started - segment.committed_at) * 1000})
                     continue
                 job = Job(segment, translate_started=started)
-                job.translation = self.translator.translate(segment.text)
+                try:
+                    job.translation = self.translator.translate(segment.text)
+                except Exception as exc:
+                    if not self.tolerate_errors:
+                        raise
+                    self.log({"type": "translation_failed", "index": segment.index, "source": segment.text,
+                              "error": f"{type(exc).__name__}: {exc}"})
+                    continue
                 job.translated_at = time.monotonic()
                 print(f"[{segment.index}] {segment.text}\n  -> {job.translation}", flush=True)
                 self.log({"type": "translated", "index": segment.index, "source": segment.text,
@@ -200,7 +218,13 @@ class Pipeline:
                 if job is None:
                     self.play_queue.put(None)
                     return
-                self.synthesize(job)
+                try:
+                    self.synthesize(job)
+                except Exception as exc:
+                    if not self.tolerate_errors:
+                        raise
+                    self.log({"type": "tts_failed", "index": job.segment.index, "translation": job.translation,
+                              "error": f"{type(exc).__name__}: {exc}"})
         except _Stopped:
             pass
         except BaseException as exc:
@@ -362,9 +386,10 @@ class Pipeline:
             window = silence = 0.0
             active = False
             end = 0.0
+            heard = ""
 
             def commit(text, final=False):
-                nonlocal segmenter, window, silence, active
+                nonlocal segmenter, window, silence, active, heard
                 try:
                     self.emit(segmenter.update(text, final=final), end)
                 except RevisionError:
@@ -376,15 +401,17 @@ class Pipeline:
                     segmenter = self.new_segmenter()
                     window = silence = 0.0
                     active = False
+                    heard = ""
 
             def finish_window():
-                nonlocal segmenter, window, silence, active
+                nonlocal segmenter, window, silence, active, heard
                 if active:
                     commit(self.asr.finish(), final=True)
                 self.asr.reset()
                 segmenter = self.new_segmenter()
                 window = silence = 0.0
                 active = False
+                heard = ""
 
             interrupted = False
             aborted = False
@@ -405,12 +432,13 @@ class Pipeline:
                         tick = time.monotonic()
                         text, changed = self.asr.feed(audio)
                         if changed:
+                            heard = text
                             self.log({"type": "partial", "text": text,
                                       "source_observed_end_seconds": end,
                                       "asr_call_ms": (time.monotonic() - tick) * 1000})
                             if not self.final_only:
                                 commit(text)
-                        if silence >= self.silence_seconds or window >= self.max_window_seconds:
+                        if silence >= self.silence_limit(heard) or window >= self.max_window_seconds:
                             finish_window()
                 except KeyboardInterrupt:
                     interrupted = True

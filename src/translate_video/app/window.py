@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from .client import EngineClient, Settings
 
+SOURCES = [("auto", "Tự động nhận diện"), ("English", "English"), ("Chinese", "中文 (Chinese)")]
 SEGMENTATION = [("punctuation", "Cắt theo dấu phẩy (trễ thấp)"), ("semantic", "Cắt theo ngữ nghĩa (trọn ý hơn)")]
 STAGES = {"asr": "Qwen3-ASR", "nllb": "NLLB dịch", "tts": "VieNeu TTS"}
 STYLE = """
@@ -80,6 +81,14 @@ class MainWindow(QWidget):
         layout.addLayout(self.speed[0])
         layout.addLayout(self.opacity[0])
 
+        source = QHBoxLayout()
+        source.addWidget(QLabel("Ngôn ngữ nguồn"))
+        self.source = QComboBox()
+        for key, label in SOURCES:
+            self.source.addItem(label, key)
+        source.addWidget(self.source, 1)
+        layout.addLayout(source)
+
         segmentation = QHBoxLayout()
         segmentation.addWidget(QLabel("Cách cắt câu"))
         self.segmentation = QComboBox()
@@ -139,6 +148,7 @@ class MainWindow(QWidget):
 
         self.volume[1].setValue(get("volume", 100, int))
         self.speed[1].setValue(get("speed", 110, int))
+        self.source.setCurrentIndex(max(self.source.findData(get("source", "auto", str)), 0))
         index = self.segmentation.findData(get("segmentation", "punctuation", str))
         self.segmentation.setCurrentIndex(max(index, 0))
         self.opacity[1].setValue(get("opacity", 100, int))
@@ -181,7 +191,7 @@ class MainWindow(QWidget):
         return asdict(Settings(
             gain=self.volume[1].value() / 100, save_audio=self.save_audio.isChecked(),
             speed=self.speed[1].value() / 100, max_speed=max(1.4, self.speed[1].value() / 100),
-            segmentation=self.segmentation.currentData()))
+            segmentation=self.segmentation.currentData(), source_language=self.source.currentData()))
 
     def on_opacity(self, value):
         self.setWindowOpacity(value / 100)
@@ -260,6 +270,10 @@ class MainWindow(QWidget):
             self.note(f"Bỏ qua một câu cũ vì trễ quá lâu ({event['waited_ms'] / 1000:.0f}s)")
         elif kind == "skipped":
             self.note("Bỏ qua câu đã là tiếng Việt")
+        elif kind == "translation_failed":
+            self.note("Dịch lỗi một câu, đã bỏ qua và tiếp tục")
+        elif kind == "tts_failed":
+            self.note("Đọc lỗi một câu, đã bỏ qua và tiếp tục")
         elif kind == "revision_reset":
             self.note("ASR đổi nội dung đã chốt; đã đồng bộ lại")
 
@@ -289,7 +303,8 @@ class MainWindow(QWidget):
                   "listening": "Dừng", "error": "Thử lại"}
         self.button.setText(labels[self.state])
         self.button.setEnabled(self.state != "loading")
-        self.segmentation.setEnabled(self.state != "listening")   # applies when listening starts
+        for box in (self.segmentation, self.source):
+            box.setEnabled(self.state != "listening")   # applies when listening starts
         if self.state == "stopped":
             self.progress.setRange(0, 1)
             self.progress.setValue(0)
@@ -304,6 +319,7 @@ class MainWindow(QWidget):
         self.settings.setValue("volume", self.volume[1].value())
         self.settings.setValue("speed", self.speed[1].value())
         self.settings.setValue("segmentation", self.segmentation.currentData())
+        self.settings.setValue("source", self.source.currentData())
         self.settings.setValue("opacity", self.opacity[1].value())
         self.settings.setValue("pin", self.pin.isChecked())
         self.settings.setValue("save_audio", self.save_audio.isChecked())

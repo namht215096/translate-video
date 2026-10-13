@@ -18,6 +18,8 @@ def main():
     parser.add_argument("--seconds", type=float, default=30)
     parser.add_argument("--clip", default=str(ROOT / "examples" / "english_10s.wav"))
     parser.add_argument("--clip-volume", type=float, default=0.25)
+    parser.add_argument("--close-while-listening", action="store_true",
+                        help="close the window instead of pressing Stop (what happens when you quit mid-session)")
     args = parser.parse_args()
 
     from PySide6.QtCore import QTimer
@@ -57,6 +59,12 @@ def main():
                 sys.executable, "-c",
                 "import time,sounddevice as sd,soundfile as sf,sys;time.sleep(1);d,r=sf.read(sys.argv[1],dtype='float32');"
                 "sd.play(d*float(sys.argv[2]),r);sd.wait()", args.clip, str(args.clip_volume)])
+        elif state["phase"] == "listening" and now > state["deadline"] and args.close_while_listening:
+            state["phase"] = "done"
+            began = time.monotonic()
+            window.close()
+            print(f"window.close() while listening took {time.monotonic() - began:.1f}s")
+            app.quit()
         elif state["phase"] == "listening" and now > state["deadline"]:
             state["phase"] = "stopping"
             window.toggle()

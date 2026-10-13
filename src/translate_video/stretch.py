@@ -8,7 +8,7 @@ same audio in any chunking gives the same output as feeding it at once.
 import numpy as np
 
 
-def adaptive_speed(lag_seconds: float, base: float, maximum: float, low: float = 1.5, high: float = 6.0) -> float:
+def adaptive_speed(lag_seconds: float, base: float, maximum: float, low: float = 1.0, high: float = 3.5) -> float:
     """Reading speed for the next sentence: `base` while on time, rising linearly to `maximum` as the
     listener falls behind (`lag_seconds` = how long the sentence has already waited + audio queued ahead)."""
     if maximum <= base or lag_seconds <= low:
