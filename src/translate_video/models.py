@@ -7,8 +7,10 @@ class QwenASR:
 
         # A single ASR stream does not need another full Python engine process.
         os.environ.setdefault("VLLM_ENABLE_V1_MULTIPROCESSING", "0")
+        from .vllm_compat import patch_transformers_for_qwen_asr, qwen_inference_config, register_qwen_tokenizer
+
+        patch_transformers_for_qwen_asr()
         from qwen_asr import Qwen3ASRModel
-        from .vllm_compat import qwen_inference_config, register_qwen_tokenizer
 
         self.model = Qwen3ASRModel.LLM(
             model=model_id,
@@ -20,7 +22,6 @@ class QwenASR:
             max_model_len=1024,
             max_num_batched_tokens=1024,
             max_num_seqs=1,
-            swap_space=0,
             max_inference_batch_size=1,
             max_new_tokens=128,
             enforce_eager=True,
@@ -114,6 +115,10 @@ class VieNeuTTS:
         )
         self.sample_rate = self.model.sample_rate
         self.voice = voice
+        # The SDK captures its CUDA graph lazily on a worker thread. Do it now, before
+        # vLLM runs ASR on the main thread, or the two collide ("stream is capturing").
+        for _ in self.synthesize_stream("Xin chào."):
+            pass
 
     def synthesize_stream(self, text: str):
         # No watermark extra or reference recording is required for preset voices.

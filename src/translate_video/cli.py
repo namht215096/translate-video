@@ -62,14 +62,23 @@ def main():
         torch.set_num_threads(2)
         if not torch.cuda.is_available():
             raise RuntimeError("Qwen streaming requires a compatible CUDA GPU")
-        if not os.environ.get("CC") and not any(shutil.which(name) for name in ("cc", "gcc", "clang")):
+        if sys.platform != "win32" and not os.environ.get("CC") and not any(shutil.which(name) for name in ("cc", "gcc", "clang")):
             raise RuntimeError("A C compiler is required by Triton. Install GCC or use the optional Zig compiler described in README.md")
+        import time
+
+        load_seconds = {}
+        mark = time.monotonic()
         print("Loading Qwen ASR...", flush=True)
         asr = QwenASR(args.asr_model, args.source_language, args.chunk_seconds, args.gpu_memory_utilization)
+        load_seconds["asr"] = time.monotonic() - mark
         print(f"Loading NLLB and {args.tts_backend} TTS...", flush=True)
+        mark = time.monotonic()
         translator = NLLBTranslator(args.source_code, args.target_code, args.model_device)
+        load_seconds["nllb"] = time.monotonic() - mark
+        mark = time.monotonic()
         tts = (VieNeuTTS(args.tts_model, args.model_device, args.tts_voice)
                if args.tts_backend == "vieneu" else MMSTTS(args.tts_model, args.model_device))
+        load_seconds["tts"] = time.monotonic() - mark
         chunks = (microphone_chunks(args.mic_device) if args.mic
                   else file_chunks(args.input, realtime=args.realtime))
         pipeline = Pipeline(
@@ -77,7 +86,7 @@ def main():
             silence_seconds=args.silence_seconds,
             max_window_seconds=args.max_window_seconds,
             rms_threshold=args.rms_threshold, final_only=args.final_only,
-            metadata={"arguments": vars(args), "packages": {
+            metadata={"arguments": vars(args), "model_load_seconds": load_seconds, "packages": {
                 name: version(name) for name in ["qwen-asr", "vllm", "torch", "transformers"]
                 + (["vieneu", "sea-g2p"] if args.tts_backend == "vieneu" else [])
             }, "gpu": torch.cuda.get_device_name(0), "tts": {
@@ -91,6 +100,9 @@ def main():
             if hasattr(tts, "close"):
                 tts.close()
     except Exception as exc:
+        if os.environ.get("TRANSLATE_VIDEO_DEBUG"):
+            import traceback
+            traceback.print_exc()
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     return 0
