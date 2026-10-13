@@ -130,7 +130,32 @@ def test_mixed_english_and_chinese_keeps_original_spacing():
 
 def test_chinese_revision_of_committed_text_is_still_detected():
     segmenter = Segmenter()
-    segmenter.update("你好，世界")
-    assert segmenter.update("你好，世界") == ["你好，"]
+    segmenter.update("你们好朋友们，世界")
+    assert segmenter.update("你们好朋友们，世界") == ["你们好朋友们，"]
     with pytest.raises(RuntimeError, match="already committed"):
-        segmenter.update("您好，世界", final=True)
+        segmenter.update("您们好朋友们，世界", final=True)
+
+
+def test_chinese_enumeration_comma_splits_a_sentence():
+    text = "首先想到的可能是论文、算法和芯片，"
+    assert stable(Segmenter(), text) == ["首先想到的可能是论文、"]               # the 5-character tail waits...
+    assert stable(Segmenter(), text, final=True) == ["首先想到的可能是论文、", "算法和芯片，"]   # ...and is flushed at the end
+    # semantic mode keeps the list together: a 、 or comma only counts once the clause is long enough
+    assert stable(Segmenter(mode="semantic"), text) == []
+    assert stable(Segmenter(mode="semantic"), text + "但是马斯克一直非常重视制造能力。") == [
+        "首先想到的可能是论文、算法和芯片，但是马斯克一直非常重视制造能力。"]
+
+
+def test_very_short_chinese_pieces_are_merged_with_the_next_one():
+    text = "AI人形机器人，Cybercab，中国芯片，电力，星舰，火星，脑机接口，甚至未来还有没有必要使用金钱？"
+    assert stable(Segmenter(), text) == [
+        "AI人形机器人，", "Cybercab，", "中国芯片，电力，", "星舰，火星，脑机接口，", "甚至未来还有没有必要使用金钱？"]
+
+
+def test_short_chinese_piece_is_still_flushed_at_the_end_of_a_window():
+    assert stable(Segmenter(), "好的。", final=True) == ["好的。"]
+    assert stable(Segmenter(), "是的，", final=False) == []
+
+
+def test_short_english_pieces_are_not_merged():
+    assert stable(Segmenter(), "Yes, okay. Fine.", final=True) == ["Yes,", "okay.", "Fine."]

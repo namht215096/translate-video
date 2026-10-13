@@ -20,7 +20,7 @@ CJK = "㐀-䶿一-鿿豈-﫿぀-ヿ"          # Han ideographs + kana
 OPENING = "“‘（(「『《〈【"
 CLOSING = "\"'”’）)」』》〉】"
 SENTENCE_PUNCT = ".!?;。！？；…"
-CLAUSE_PUNCT = ",:，："
+CLAUSE_PUNCT = ",:，：、"
 
 TOKEN = re.compile(
     rf"(\s*)((?:[{re.escape(OPENING)}]*[{CJK}](?:[{re.escape(SENTENCE_PUNCT + CLAUSE_PUNCT + CLOSING + '、—')}])*)"
@@ -59,14 +59,15 @@ class Segmenter:
     Stability is agreement between consecutive *decode results*, not repeated
     reads of the same result. Once committed, speech cannot be revised.
 
-    mode="punctuation": cut at every , . ; : ! ? (and 。，！？；：…; lowest delay, but clauses are translated alone).
+    mode="punctuation": cut at every , . ; : ! ? (and 。，！？；：、…; lowest delay, but clauses are translated alone;
+    a Chinese/Japanese piece under `cjk_min_piece` words waits for the next piece).
     mode="semantic": cut at sentence ends, and at a comma/colon only once the clause has at least
     `min_words` words; a long run without punctuation is cut before a clause opener (and, but, because,
     但是, 因为...) instead of at an arbitrary word. Fewer, more complete pieces; waits a little longer for them.
     """
 
     def __init__(self, max_words: int = 24, mode: str = "punctuation", min_words: int = 8,
-                 soft_words: int = 16):
+                 soft_words: int = 16, cjk_min_piece: float = 3.0):
         if max_words < 1:
             raise ValueError("max_words must be positive")
         if mode not in MODES:
@@ -75,6 +76,9 @@ class Segmenter:
         self.mode = mode
         self.min_words = min_words
         self.soft_words = min(soft_words, max_words)
+        # Chinese/Japanese pieces shorter than this (3 words == 6 characters) wait for the next piece:
+        # "电力，星舰，" translates poorly on its own, and list items arrive faster than they can be spoken.
+        self.cjk_min_piece = cjk_min_piece
         self.previous: list[str] = []
         self.committed: list[str] = []
 
@@ -142,7 +146,9 @@ class Segmenter:
     def find_end(self, words, start, stable, final):
         """Exclusive end index of the next piece, or None if more stable words are needed."""
         if self.mode == "punctuation":
-            end = next((i + 1 for i in range(start, stable) if ANY_PUNCTUATION.search(words[i])), None)
+            floor = self.cjk_min_piece if CJK_TOKEN.match(words[start]) else 0
+            end = next((i + 1 for i in range(start, stable)
+                        if ANY_PUNCTUATION.search(words[i]) and self.size(words, start, i + 1) >= floor), None)
         else:
             end = next(
                 (i + 1 for i in range(start, stable)
