@@ -73,3 +73,64 @@ def test_semantic_waits_for_stability_and_flushes_at_the_end():
 def test_unknown_mode_is_rejected():
     with pytest.raises(ValueError):
         Segmenter(mode="vibes")
+
+
+MUSK = ("你可能无法相信，最近马斯克在硅谷接受了央视财经的一次长时间专访，而这次采访真正有意思的地方，"
+        "并不是他说了多少漂亮话，而是他几乎把自己对未来十几年甚至二十年的。")
+
+
+def test_chinese_text_without_spaces_is_cut_at_each_chinese_comma():
+    assert stable(Segmenter(), MUSK) == [
+        "你可能无法相信，",
+        "最近马斯克在硅谷接受了央视财经的一次长时间专访，",
+        "而这次采访真正有意思的地方，",
+        "并不是他说了多少漂亮话，",
+        "而是他几乎把自己对未来十几年甚至二十年的。",
+    ]
+
+
+def test_chinese_semantic_mode_keeps_clauses_together():
+    assert stable(Segmenter(mode="semantic"), MUSK) == [
+        "你可能无法相信，最近马斯克在硅谷接受了央视财经的一次长时间专访，",
+        "而这次采访真正有意思的地方，并不是他说了多少漂亮话，",
+        "而是他几乎把自己对未来十几年甚至二十年的。",
+    ]
+
+
+def test_chinese_waits_for_stability_before_committing():
+    segmenter = Segmenter()
+    assert segmenter.update("你可能无法相信，最近") == []
+    assert segmenter.update("你可能无法相信，最近马斯克") == ["你可能无法相信，"]
+    assert segmenter.update("你可能无法相信，最近马斯克", final=True) == ["最近马斯克"]
+
+
+def test_chinese_length_limit_counts_a_character_as_half_a_word():
+    text = "".join("字" * 10 + "" for _ in range(8))          # 80 characters, no punctuation
+    pieces = stable(Segmenter(max_words=24), text)
+    assert pieces and all(len(piece) == 48 for piece in pieces)       # 24 words == 48 characters
+    assert stable(Segmenter(max_words=24), "字" * 47) == []
+
+
+def test_other_chinese_and_closing_punctuation_end_a_sentence():
+    assert stable(Segmenter(mode="semantic"), "他说：“我们走吧！”然后就离开了。", final=True) == [
+        "他说：“我们走吧！”", "然后就离开了。"]
+    assert stable(Segmenter(mode="semantic"), "真的吗？不可能！", final=True) == ["真的吗？", "不可能！"]
+
+
+def test_chinese_clause_opener_splits_a_long_unpunctuated_run():
+    text = "我们在实验室里测试了三种不同的方法而最后一种效果最好大家都很满意"
+    pieces = stable(Segmenter(mode="semantic"), text)
+    assert pieces == ["我们在实验室里测试了三种不同的方法"]
+
+
+def test_mixed_english_and_chinese_keeps_original_spacing():
+    text = "他用iPhone 15拍了这个视频，I think it looks great，真的。"
+    assert stable(Segmenter(), text, final=True) == ["他用iPhone 15拍了这个视频，", "I think it looks great，", "真的。"]
+
+
+def test_chinese_revision_of_committed_text_is_still_detected():
+    segmenter = Segmenter()
+    segmenter.update("你好，世界")
+    assert segmenter.update("你好，世界") == ["你好，"]
+    with pytest.raises(RuntimeError, match="already committed"):
+        segmenter.update("您好，世界", final=True)
