@@ -16,6 +16,7 @@ def parser():
     result.add_argument("--realtime", action="store_true", help="Pace file input according to its audio clock")
     result.add_argument("--play", action="store_true", help="Play translated speech through the default output device")
     result.add_argument("--output", type=Path, required=True, help="New directory for JSON logs and configuration; audio is not saved")
+    result.add_argument("--save-audio", action="store_true", help="Also write each translated segment as audio/segment_NNN.wav in --output")
     result.add_argument("--asr-model", default="Qwen/Qwen3-ASR-1.7B")
     result.add_argument("--source-language", default="English")
     result.add_argument("--source-code", default="eng_Latn", help="NLLB source language code")
@@ -29,6 +30,10 @@ def parser():
     result.add_argument("--silence-seconds", type=float, default=0.6)
     result.add_argument("--max-window-seconds", type=float, default=12.0)
     result.add_argument("--rms-threshold", type=float, default=0.008)
+    result.add_argument("--speed", type=float, default=1.1, help="Base speaking speed (pitch preserved); 1.0 disables stretching")
+    result.add_argument("--max-speed", type=float, default=1.4, help="Speed reached when the listener falls behind; set equal to --speed to disable")
+    result.add_argument("--segmentation", choices=["punctuation", "semantic"], default="punctuation",
+                        help="punctuation: cut at every comma/period (lowest delay); semantic: keep clauses together")
     result.add_argument("--final-only", action="store_true", help="Commit text only when each ASR window finishes")
     return result
 
@@ -50,6 +55,8 @@ def main():
         arguments.error("time settings must be positive")
     if args.max_window_seconds < args.chunk_seconds:
         arguments.error("--max-window-seconds must be at least --chunk-seconds")
+    if args.speed < 1 or args.max_speed < args.speed or args.max_speed > 2:
+        arguments.error("--speed must be >= 1 and --max-speed between --speed and 2")
     if args.rms_threshold < 0:
         arguments.error("--rms-threshold must be nonnegative")
     try:
@@ -86,6 +93,8 @@ def main():
             silence_seconds=args.silence_seconds,
             max_window_seconds=args.max_window_seconds,
             rms_threshold=args.rms_threshold, final_only=args.final_only,
+            save_audio=args.save_audio, speed=args.speed, max_speed=args.max_speed,
+            segmentation=args.segmentation,
             metadata={"arguments": vars(args), "model_load_seconds": load_seconds, "packages": {
                 name: version(name) for name in ["qwen-asr", "vllm", "torch", "transformers"]
                 + (["vieneu", "sea-g2p"] if args.tts_backend == "vieneu" else [])
