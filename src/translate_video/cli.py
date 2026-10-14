@@ -30,8 +30,8 @@ def parser():
     result.add_argument("--silence-seconds", type=float, default=0.6)
     result.add_argument("--max-window-seconds", type=float, default=12.0)
     result.add_argument("--rms-threshold", type=float, default=0.008)
-    result.add_argument("--speed", type=float, default=1.1, help="Base speaking speed (pitch preserved); 1.0 disables stretching")
-    result.add_argument("--max-speed", type=float, default=1.4, help="Speed reached when the listener falls behind; set equal to --speed to disable")
+    result.add_argument("--speed", type=float, default=1.2, help="Base speaking speed (pitch preserved); 1.0 disables stretching")
+    result.add_argument("--max-speed", type=float, default=1.8, help="Speed reached when the listener falls behind; set equal to --speed to disable")
     result.add_argument("--segmentation", choices=["punctuation", "semantic"], default="punctuation",
                         help="punctuation: cut at every comma/period (lowest delay); semantic: keep clauses together")
     result.add_argument("--final-only", action="store_true", help="Commit text only when each ASR window finishes")

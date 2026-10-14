@@ -7,20 +7,21 @@ import os
 from PySide6.QtCore import QSettings, QSize, Qt, QTimer
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QHBoxLayout, QLabel, QProgressBar, QPushButton, QSlider, QTextEdit, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QHBoxLayout, QLabel, QPlainTextEdit, QProgressBar, QPushButton, QSlider, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from .client import EngineClient, Settings
 
 SOURCES = [("auto", "Tự động nhận diện"), ("English", "English"), ("Chinese", "中文 (Chinese)")]
 SEGMENTATION = [("punctuation", "Cắt theo dấu phẩy (trễ thấp)"), ("semantic", "Cắt theo ngữ nghĩa (trọn ý hơn)")]
+ZH_TRANSLATORS = [("opus", "OPUS-MT zh-vi (Helsinki-NLP)"), ("nllb", "NLLB-200 600M")]
 STAGES = {"asr": "Qwen3-ASR", "nllb": "NLLB dịch", "tts": "VieNeu TTS"}
 STYLE = """
 QWidget { background: #1e2127; color: #e6e6e6; font-size: 13px; }
 QPushButton { background: #2f6fed; border: none; border-radius: 6px; padding: 8px 14px; font-weight: 600; }
 QPushButton:disabled { background: #3a3f4a; color: #8a8f99; }
 QPushButton#secondary { background: #3a3f4a; font-weight: 400; padding: 5px 10px; }
-QTextEdit { background: #15181d; border: 1px solid #2c313a; border-radius: 6px; }
+QTextEdit, QPlainTextEdit { background: #15181d; border: 1px solid #2c313a; border-radius: 6px; }
 QProgressBar { background: #15181d; border: 1px solid #2c313a; border-radius: 4px; height: 8px; }
 QProgressBar::chunk { background: #38b36a; border-radius: 3px; }
 QLabel#muted { color: #8a8f99; }
@@ -74,8 +75,24 @@ class MainWindow(QWidget):
         self.transcript.document().setMaximumBlockCount(400)
         layout.addWidget(self.transcript, 1)
 
+        context = QHBoxLayout()
+        context.addWidget(QLabel("Ngữ cảnh (nguồn | bản dịch)"), 1)
+        self.apply_context = QPushButton("Áp dụng")
+        self.apply_context.setObjectName("secondary")
+        self.apply_context.clicked.connect(self.on_apply_context)
+        self.reset = QPushButton("Video mới (reset)")
+        self.reset.setObjectName("secondary")
+        self.reset.clicked.connect(self.on_reset)
+        context.addWidget(self.apply_context)
+        context.addWidget(self.reset)
+        layout.addLayout(context)
+        self.context_box = QPlainTextEdit()
+        self.context_box.setPlaceholderText("Mỗi dòng một câu: câu gốc | bản dịch (bản dịch có thể bỏ trống)")
+        self.context_box.setFixedHeight(70)
+        layout.addWidget(self.context_box)
+
         self.volume = self.slider("Âm lượng giọng dịch", 0, 200, 100, self.on_volume)
-        self.speed = self.slider("Tốc độ đọc cơ bản", 100, 140, 110, self.on_speed, suffix="x", scale=100)
+        self.speed = self.slider("Tốc độ đọc cơ bản", 100, 180, 120, self.on_speed, suffix="x", scale=100)
         self.opacity = self.slider("Độ trong suốt cửa sổ", 35, 100, 100, self.on_opacity)
         layout.addLayout(self.volume[0])
         layout.addLayout(self.speed[0])
@@ -88,6 +105,14 @@ class MainWindow(QWidget):
             self.source.addItem(label, key)
         source.addWidget(self.source, 1)
         layout.addLayout(source)
+
+        zh = QHBoxLayout()
+        zh.addWidget(QLabel("Model dịch tiếng Trung"))
+        self.zh_translator = QComboBox()
+        for key, label in ZH_TRANSLATORS:
+            self.zh_translator.addItem(label, key)
+        zh.addWidget(self.zh_translator, 1)
+        layout.addLayout(zh)
 
         segmentation = QHBoxLayout()
         segmentation.addWidget(QLabel("Cách cắt câu"))
@@ -147,8 +172,9 @@ class MainWindow(QWidget):
                 return default
 
         self.volume[1].setValue(get("volume", 100, int))
-        self.speed[1].setValue(get("speed", 110, int))
+        self.speed[1].setValue(get("speed", 120, int))
         self.source.setCurrentIndex(max(self.source.findData(get("source", "auto", str)), 0))
+        self.zh_translator.setCurrentIndex(max(self.zh_translator.findData(get("zh_translator", "opus", str)), 0))
         index = self.segmentation.findData(get("segmentation", "punctuation", str))
         self.segmentation.setCurrentIndex(max(index, 0))
         self.opacity[1].setValue(get("opacity", 100, int))
@@ -179,6 +205,27 @@ class MainWindow(QWidget):
             self.client.send("start", settings)
         self.render()
 
+    def on_reset(self):
+        """New video: forget the translation context and clear the window (the session log on disk is kept)."""
+        self.transcript.clear()
+        self.context_box.clear()
+        self.live.setText("")
+        if self.client.alive:
+            self.client.send("reset_context")
+
+    def on_apply_context(self):
+        pairs = []
+        for line in self.context_box.toPlainText().splitlines():
+            source, _, translation = line.partition("|")
+            if source.strip():
+                pairs.append([source.strip(), translation.strip()])
+        if self.client.alive:
+            self.client.send("context", pairs)
+
+    def show_context(self, pairs):
+        if not self.context_box.hasFocus():       # never overwrite what the user is typing
+            self.context_box.setPlainText("\n".join(f"{source} | {translation}" for source, translation in pairs))
+
     def on_volume(self, value):
         if self.client.alive:
             self.client.send("gain", value / 100)
@@ -190,8 +237,9 @@ class MainWindow(QWidget):
     def current_settings(self):
         return asdict(Settings(
             gain=self.volume[1].value() / 100, save_audio=self.save_audio.isChecked(),
-            speed=self.speed[1].value() / 100, max_speed=max(1.4, self.speed[1].value() / 100),
-            segmentation=self.segmentation.currentData(), source_language=self.source.currentData()))
+            speed=self.speed[1].value() / 100, max_speed=max(1.8, self.speed[1].value() / 100),
+            segmentation=self.segmentation.currentData(), source_language=self.source.currentData(),
+            zh_translator=self.zh_translator.currentData()))
 
     def on_opacity(self, value):
         self.setWindowOpacity(value / 100)
@@ -261,6 +309,9 @@ class MainWindow(QWidget):
         elif kind == "translated":
             self.live.setText("")
             self.append(event["source"], event["translation"])
+            self.show_context(event.get("context", []))
+        elif kind == "context":
+            self.show_context(event["pairs"])
         elif kind == "segment":
             self.footer.setText(
                 f"Trễ chốt câu→loa {event.get('commit_to_speaker_ms', 0) / 1000:.1f}s · "
@@ -303,7 +354,7 @@ class MainWindow(QWidget):
                   "listening": "Dừng", "error": "Thử lại"}
         self.button.setText(labels[self.state])
         self.button.setEnabled(self.state != "loading")
-        for box in (self.segmentation, self.source):
+        for box in (self.segmentation, self.source, self.zh_translator):
             box.setEnabled(self.state != "listening")   # applies when listening starts
         if self.state == "stopped":
             self.progress.setRange(0, 1)
@@ -319,6 +370,7 @@ class MainWindow(QWidget):
         self.settings.setValue("volume", self.volume[1].value())
         self.settings.setValue("speed", self.speed[1].value())
         self.settings.setValue("segmentation", self.segmentation.currentData())
+        self.settings.setValue("zh_translator", self.zh_translator.currentData())
         self.settings.setValue("source", self.source.currentData())
         self.settings.setValue("opacity", self.opacity[1].value())
         self.settings.setValue("pin", self.pin.isChecked())

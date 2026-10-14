@@ -55,14 +55,27 @@ stalls ~50 s once while Triton compiles kernels.
   (`translate -> tts_queue -> TTS -> play_queue -> playback`). A sentence goes to TTS the moment it is translated, and the
   translator immediately takes the next one; neither waits for the speaker.
 - **Reading speed** (pitch preserved; streaming WSOLA in `stretch.py`, ~0.5 % of the audio duration in CPU time):
-  base **x1.1** always, rising linearly to **x1.4** as the listener falls behind. The delay used is
-  `time since the sentence was committed + seconds of speech still queued ahead of it`: x1.1 up to 1.5 s, x1.4 from 6 s
+  base **x1.2** always, rising linearly to **x1.8** as the listener falls behind. The delay used is
+  `time since the sentence was committed + seconds of speech still queued ahead of it`: x1.2 up to 1.5 s, x1.8 from 6 s
   (`speed_low_lag`/`speed_high_lag`). Per-sentence speed is logged as `speed` / `lag_at_tts_ms`.
 - **No sentence is dropped** any more (`max_lag_seconds` exists but the app leaves it unset). Pressing Stop discards the
   queued speech immediately.
 - **Segmentation** (`--segmentation` / "Cách cắt câu" in the window, applies when listening starts):
   `punctuation` (default) cuts at every `, . ; : ! ?`; `semantic` cuts at sentence ends, at a comma only after >= 8 words,
   and a long unpunctuated run before a clause opener (and, but, because, which, ...). Fewer, more complete pieces; it waits longer.
-- CLI: `--speed 1.1 --max-speed 1.4 --segmentation punctuation`; in the window the "Tốc độ đọc cơ bản" slider changes the base speed live.
+- CLI: `--speed 1.2 --max-speed 1.8 --segmentation punctuation`; in the window the "Tốc độ đọc cơ bản" slider changes the base speed live.
 - New log events: `translated` (text as soon as it is translated) and, on every `segment`: `tts_queue_ms`, `speed`,
   `lag_at_tts_ms`, `commit_to_speaker_ms`, `playback_wait_ms`. The `segment` event is now written when the sentence has been played.
+
+## Ngữ cảnh dịch và nút "Video mới (reset)"
+
+- Mỗi câu được dịch cùng 3 câu trước đó (`context_sentences`). Phần tiếng Việt đã đọc được đưa vào decoder của NLLB như
+  tiền tố cố định, nên mô hình chỉ sinh phần tiếp theo: TTS chỉ nhận đúng đoạn mới, không cần tách chuỗi.
+- Ngữ cảnh tiếp tục chạy qua các lần Dừng/Bắt đầu. "Video mới (reset)" xóa ngữ cảnh và xóa log trên cửa sổ
+  (file `output/app-*/events.jsonl` vẫn giữ đầy đủ).
+- Ô "Ngữ cảnh" có thể sửa tay (mỗi dòng `câu gốc | bản dịch`, bản dịch bỏ trống thì được dịch tự động) rồi bấm "Áp dụng".
+
+## Model dịch tiếng Trung
+
+Ô "Model dịch tiếng Trung" chọn giữa `Helsinki-NLP/opus-mt-zh-vi` (mặc định) và NLLB-200 600M; câu tiếng Anh luôn dùng NLLB.
+Mỗi câu được định tuyến theo chữ viết của nó (`RoutingTranslator` trong `models.py`). Đổi lựa chọn có hiệu lực ở lần Bắt đầu nghe tiếp theo.

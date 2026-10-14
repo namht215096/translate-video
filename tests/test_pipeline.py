@@ -440,3 +440,30 @@ def test_a_mid_sentence_pause_does_not_close_a_chinese_window(tmp_path):
     asr2 = ChineseASR()
     Pipeline(asr2, Translator(), TTS(), tmp_path / "plain", silence_seconds=0.6, on_revision="reset").run(chunks)
     assert resets_with_cjk_limit < asr2.resets          # 0.7 s of silence closes the window only with the 0.6 s limit
+
+
+def test_context_is_passed_to_the_translator_and_reset_clears_it(tmp_path):
+    seen = []
+
+    class ContextTranslator:
+        supports_context = True
+
+        def translate(self, text, context=None):
+            seen.append((text, list(context or [])))
+            return text.upper()
+
+    pipeline = Pipeline(ASR(), ContextTranslator(), TTS(), tmp_path / "run", context_sentences=2)
+    pipeline.log_file = open(tmp_path / "log.jsonl", "w", encoding="utf-8")
+    for text in ("one.", "two.", "three."):
+        pipeline.context.append((text, text.upper()))
+    assert list(pipeline.context) == [("two.", "TWO."), ("three.", "THREE.")]   # only the last N are kept
+    pipeline.translate_with_context("four.")
+    assert seen[-1] == ("four.", [("two.", "TWO."), ("three.", "THREE.")])
+    pipeline.set_context([("x.", ""), ("y.", "Y.")])         # an empty translation is filled in by the translator
+    pipeline.apply_pending_context()
+    assert list(pipeline.context) == [("x.", "X."), ("y.", "Y.")]
+    pipeline.reset_context()
+    pipeline.apply_pending_context()
+    pipeline.translate_with_context("five.")
+    assert not pipeline.context and seen[-1] == ("five.", [])
+    pipeline.log_file.close()

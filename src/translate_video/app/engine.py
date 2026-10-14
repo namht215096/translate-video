@@ -1,7 +1,7 @@
 """Engine process: loads the models once, then runs capture -> ASR -> translation -> TTS sessions.
 
 Commands arrive on a multiprocessing queue as tuples; results go back as dict events:
-  ("load", settings) ("start", settings) ("stop",) ("gain", value) ("speed", value) ("shutdown",)
+  ("load", settings) ("start", settings) ("stop",) ("gain", value) ("speed", value) ("reset_context",) ("context", pairs) ("shutdown",)
 """
 
 from dataclasses import asdict, dataclass
@@ -21,8 +21,8 @@ class Settings:
     max_window_seconds: float = 12.0
     chunk_seconds: float = 1.0
     gpu_memory_utilization: float = 0.45
-    speed: float = 1.1            # base reading speed
-    max_speed: float = 1.4        # reached when the listener falls behind
+    speed: float = 1.2            # base reading speed
+    max_speed: float = 1.8        # reached when the listener falls behind
     segmentation: str = "punctuation"
     speed_low_lag: float = 1.0    # delay (s) where speed starts to rise above `speed` ...
     speed_high_lag: float = 3.5   # ... and where it reaches `max_speed`
@@ -31,6 +31,8 @@ class Settings:
     save_audio: bool = False
     tts_voice: str | None = None
     model_device: str = "cuda:0"
+    zh_translator: str = "opus"   # "opus" = Helsinki-NLP/opus-mt-zh-vi for Chinese sentences, "nllb" = NLLB for everything
+    context_sentences: int = 3    # previous sentences given to the translator as context
 
 
 def engine_main(commands, events, root: str):
@@ -75,7 +77,7 @@ class Engine:
             return
         settings = Settings(**settings)
         import torch
-        from ..models import NLLBTranslator, QwenASR, VieNeuTTS
+        from ..models import NLLBTranslator, OpusTranslator, QwenASR, VieNeuTTS
 
         torch.set_num_threads(2)
         if not torch.cuda.is_available():
@@ -88,13 +90,14 @@ class Engine:
         mark = time.monotonic()
         self.send("loading", stage="nllb", step=2, steps=3)
         translator = NLLBTranslator("eng_Latn", "vie_Latn", settings.model_device)
+        opus = OpusTranslator("Helsinki-NLP/opus-mt-zh-vi", settings.model_device)
         seconds["nllb"] = time.monotonic() - mark
         mark = time.monotonic()
         self.send("loading", stage="tts", step=3, steps=3)
         tts = VieNeuTTS("pnnbao-ump/VieNeu-TTS-v3-Turbo", settings.model_device, settings.tts_voice)
         seconds["tts"] = time.monotonic() - mark
         info = {"load_seconds": seconds, "gpu": torch.cuda.get_device_name(0)}
-        self.models = {"asr": asr, "translator": translator, "tts": tts, "info": info}
+        self.models = {"asr": asr, "translator": translator, "opus": opus, "tts": tts, "info": info}
         self.send("ready", **info)
 
     def start(self, settings: dict):
@@ -119,6 +122,14 @@ class Engine:
         if self.session:
             self.session.set_speed(value)
 
+    def reset_context(self):
+        if self.session:
+            self.session.reset_context()
+
+    def context(self, pairs):
+        if self.session:
+            self.session.set_context(pairs)
+
 
 class Session:
     """One listening session: owns the audio streams and a Pipeline run."""
@@ -139,6 +150,14 @@ class Session:
         if self.pipeline:
             self.pipeline.speed = value
             self.pipeline.max_speed = max(self.pipeline.max_speed, value)
+
+    def reset_context(self):
+        if self.pipeline:
+            self.pipeline.reset_context()
+
+    def set_context(self, pairs):
+        if self.pipeline:
+            self.pipeline.set_context(pairs)
 
     def stop(self):
         self.stop_event.set()
@@ -165,6 +184,7 @@ class Session:
     def run(self):
         from ..language import looks_vietnamese
         from ..loopback import SystemAudio
+        from ..models import RoutingTranslator
         from ..pipeline import Pipeline
 
         send, models, settings = self.engine.send, self.engine.models, self.settings
@@ -179,13 +199,16 @@ class Session:
                 models["asr"].set_language(None if settings.source_language == "auto" else settings.source_language)
                 models["asr"].reset()
                 output = self.engine.root / "output" / datetime.now().strftime("app-%Y%m%d-%H%M%S")
+                translator = models["translator"]
+                if settings.zh_translator == "opus":
+                    translator = RoutingTranslator(models["opus"], translator)
                 pipeline = self.pipeline = Pipeline(
-                    models["asr"], models["translator"], models["tts"], output,
+                    models["asr"], translator, models["tts"], output,
                     player=system.player, on_event=self.forward, stop_event=self.stop_event,
                     on_revision="reset", skip_source=looks_vietnamese,
                     speed=settings.speed, max_speed=settings.max_speed, segmentation=settings.segmentation,
                     speed_low_lag=settings.speed_low_lag, speed_high_lag=settings.speed_high_lag,
-                    silence_seconds_cjk=settings.silence_seconds_cjk, tolerate_errors=True,
+                    silence_seconds_cjk=settings.silence_seconds_cjk, tolerate_errors=True, context_sentences=settings.context_sentences,
                     silence_seconds=settings.silence_seconds, max_window_seconds=settings.max_window_seconds,
                     rms_threshold=settings.rms_threshold, save_audio=settings.save_audio,
                     metadata={"arguments": {**asdict(settings), "app": True, "tts_backend": "vieneu", "realtime": True},

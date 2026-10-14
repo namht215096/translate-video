@@ -7,6 +7,7 @@ translation or synthesis. Instead the reading speed rises with the delay the lis
 (see `stretch.adaptive_speed`); no sentence is dropped unless `max_lag_seconds` is set explicitly.
 """
 
+from collections import deque
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
@@ -57,7 +58,8 @@ class Pipeline:
                  player=None, on_event=None, stop_event=None, on_revision="stop",
                  max_lag_seconds=None, skip_source=None,
                  speed=1.0, max_speed=None, speed_low_lag=1.0, speed_high_lag=3.5,
-                 segmentation="punctuation", silence_seconds_cjk=None, tolerate_errors=False):
+                 segmentation="punctuation", silence_seconds_cjk=None, tolerate_errors=False,
+                 context_sentences=3):
         self.asr, self.translator, self.tts = asr, translator, tts
         self.output = output
         self.play = play
@@ -91,6 +93,40 @@ class Pipeline:
         self.audio_finished = 0.0        # seconds of speech whose playback has completed
         self.playing = None              # (job, monotonic start) while a sentence is being played
         self.index = 0
+        # (source, Vietnamese) of the last sentences already handed to TTS: the translator sees them as context.
+        self.context = deque(maxlen=max(0, context_sentences))
+        self.context_lock = threading.Lock()
+        self.pending_context = None      # set by reset_context/set_context; applied by the translate stage
+
+    # ---- translation context (new video / manual edit) ----
+    def reset_context(self):
+        self.set_context([])
+
+    def set_context(self, pairs):
+        """Replace the context before the next sentence is translated. A pair whose translation is empty is
+        translated once, with the pairs before it as context."""
+        with self.context_lock:
+            self.pending_context = [(str(s), str(v)) for s, v in pairs]
+
+    def apply_pending_context(self):
+        with self.context_lock:
+            pairs, self.pending_context = self.pending_context, None
+        if pairs is None:
+            return
+        self.context.clear()
+        for source, translation in pairs[-self.context.maxlen:] if self.context.maxlen else []:
+            if not translation.strip() and source.strip():
+                try:
+                    translation = self.translate_with_context(source)
+                except Exception:
+                    continue
+            self.context.append((source, translation))
+        self.log({"type": "context", "pairs": [list(pair) for pair in self.context]})
+
+    def translate_with_context(self, text):
+        if self.context and getattr(self.translator, "supports_context", False):
+            return self.translator.translate(text, context=list(self.context))
+        return self.translator.translate(text)
 
     # ---- shared helpers ----
     def log(self, event):
@@ -180,6 +216,7 @@ class Pipeline:
                 if segment is None:
                     self.tts_queue.put(None)
                     return
+                self.apply_pending_context()
                 if self.skip_source and self.skip_source(segment.text):
                     # e.g. already Vietnamese: our own speech heard again, or the wrong source language
                     self.log({"type": "skipped", "index": segment.index, "source": segment.text})
@@ -191,7 +228,7 @@ class Pipeline:
                     continue
                 job = Job(segment, translate_started=started)
                 try:
-                    job.translation = self.translator.translate(segment.text)
+                    job.translation = self.translate_with_context(segment.text)
                 except Exception as exc:
                     if not self.tolerate_errors:
                         raise
@@ -201,7 +238,7 @@ class Pipeline:
                 job.translated_at = time.monotonic()
                 print(f"[{segment.index}] {segment.text}\n  -> {job.translation}", flush=True)
                 self.log({"type": "translated", "index": segment.index, "source": segment.text,
-                          "translation": job.translation,
+                          "translation": job.translation, "context_size": len(self.context), "context": [list(pair) for pair in self.context],
                           "translation_queue_ms": (started - segment.committed_at) * 1000,
                           "translation_ms": (job.translated_at - started) * 1000})
                 self.tts_queue.put(job)      # straight on to TTS; this thread moves on to the next sentence
