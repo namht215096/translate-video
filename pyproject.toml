@@ -14,16 +14,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10"]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1"]
 compiler = ["ziglang==0.13.0"]
 plot = ["matplotlib>=3.10,<4"]
 vieneu = ["vieneu==3.8.3"]
+web = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "websockets>=14,<18"]
 
 [project.scripts]
 translate-video = "translate_video.cli:main"
+translate-video-web = "translate_video.web:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+translate_video = ["static/*.html", "static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

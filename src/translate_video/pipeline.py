@@ -22,19 +22,24 @@ class Segment:
 class Pipeline:
     def __init__(self, asr, translator, tts, output: Path, *, play=False,
                  silence_seconds=0.6, max_window_seconds=12.0,
-                 rms_threshold=0.008, final_only=False, metadata=None):
+                 rms_threshold=0.008, final_only=False, metadata=None,
+                 player=None, on_event=None, stop_event=None, max_segment_words=24,
+                 segment_holdback_words=0):
         self.asr, self.translator, self.tts = asr, translator, tts
         self.output = output
         self.play = play
-        self.player = AudioPlayer() if play else None
+        self.player = player if player is not None else (AudioPlayer() if play else None)
+        self.on_event = on_event
         self.silence_seconds = silence_seconds
         self.max_window_seconds = max_window_seconds
         self.rms_threshold = rms_threshold
         self.final_only = final_only
+        self.max_segment_words = max_segment_words
+        self.segment_holdback_words = segment_holdback_words
         self.metadata = metadata or {}
         self.text_queue = queue.Queue(maxsize=32)
         self.errors = queue.Queue()
-        self.stopped = threading.Event()
+        self.stopped = stop_event if stop_event is not None else threading.Event()
         self.log_lock = threading.Lock()
         self.index = 0
 
@@ -42,6 +47,8 @@ class Pipeline:
         with self.log_lock:
             self.log_file.write(json.dumps(event, ensure_ascii=False) + "\n")
             self.log_file.flush()
+            if self.on_event:
+                self.on_event(event)
 
     def check(self):
         if not self.errors.empty():
@@ -82,6 +89,10 @@ class Pipeline:
                 started = time.monotonic()
                 translation = self.translator.translate(segment.text)
                 translated = time.monotonic()
+                self.log({"type": "translation", "index": segment.index,
+                          "source": segment.text, "translation": translation,
+                          "translation_queue_ms": (started - segment.committed_at) * 1000,
+                          "translation_ms": (translated - started) * 1000})
                 streaming = hasattr(self.tts, "synthesize_stream")
                 stream_times = {}
                 if streaming:
@@ -170,18 +181,20 @@ class Pipeline:
         with (self.output / "events.jsonl").open("w", encoding="utf-8") as self.log_file:
             worker = threading.Thread(target=self.translate_worker)
             worker.start()
-            segmenter = Segmenter()
+            segmenter = Segmenter(max_words=self.max_segment_words,
+                                  holdback_words=self.segment_holdback_words)
             window = silence = 0.0
             active = False
             end = 0.0
 
             def finish_window():
                 nonlocal segmenter, window, silence, active
-                if active:
+                if active and not self.stopped.is_set():
                     text = self.asr.finish()
                     self.emit(segmenter.update(text, final=True), end)
                 self.asr.reset()
-                segmenter = Segmenter()
+                segmenter = Segmenter(max_words=self.max_segment_words,
+                                      holdback_words=self.segment_holdback_words)
                 window = silence = 0.0
                 active = False
 
@@ -189,6 +202,8 @@ class Pipeline:
             try:
                 try:
                     for audio, end in chunks:
+                        if self.stopped.is_set():
+                            break
                         self.check()
                         duration = len(audio) / 16000
                         voiced = float(np.sqrt(np.mean(audio ** 2))) >= self.rms_threshold
@@ -209,6 +224,9 @@ class Pipeline:
                             finish_window()
                 except KeyboardInterrupt:
                     interrupted = True
+                if self.stopped.is_set():
+                    self.check()
+                    return
                 finish_window()
                 self.put(self.text_queue, None)
                 worker.join()

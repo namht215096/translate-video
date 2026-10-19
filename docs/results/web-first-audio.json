@@ -1,0 +1,28 @@
+{
+  "input": "examples/ENG_US_M_DaveL.mp3 (19.898 seconds)",
+  "runs": [
+    {
+      "first_scheduled_audio_ms": 4110.200000000186,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 4085.7000000001863,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 4079.7000000001863,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 4094.5,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 4053.4000000003725,
+      "completed_full_file": true
+    }
+  ],
+  "p95_button_to_first_scheduled_audio_ms": 4110.200000000186,
+  "conditions": "Models preloaded and warmed; 0.5-second ASR updates; 8-word stable segments; real GPU inference; Chromium browser, no playback pauses. Browser scheduling time, not physical speaker latency. Only five runs. First four stop after first audio; fifth verifies complete playback. Three trailing words remain provisional until more speech arrives.",
+  "browser_errors": []
+}

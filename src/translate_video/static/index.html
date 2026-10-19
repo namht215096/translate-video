@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f2">
+  <title>Translate Studio · Lồng tiếng trực tiếp</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="header"><a class="brand" href="/" aria-label="Translate Studio"><span class="brand-icon">↗</span> translate<span class="brand-light">studio</span></a><span class="server-status" id="serverStatus"><i></i> Đang kết nối máy dịch</span></header>
+  <main>
+    <section class="intro"><div><div class="eyebrow"><span></span> KHÔNG GIAN LỒNG TIẾNG</div><h1>Một file âm thanh.<br><span>Một ngôn ngữ gần hơn.</span></h1><p>Nghe tiếng Anh và bản dịch tiếng Việt khi audio đang phát.</p></div><div class="language-pair"><span>EN</span><b>→</b><span class="vi">VI</span><small>Tiếng Anh sang tiếng Việt</small></div></section>
+
+    <div class="workspace">
+      <section class="card audio-card" aria-labelledby="audioHeading">
+        <div class="card-heading"><h2 id="audioHeading"><span class="step">01</span> Audio của bạn</h2><span class="small-label">MP3 / WAV / M4A</span></div>
+        <input id="fileInput" type="file" accept="audio/*,.mp3,.wav,.m4a" hidden>
+        <button class="drop-zone" id="dropZone"><span class="upload-icon" aria-hidden="true">↥</span><strong>Kéo file MP3 vào đây</strong><span>hoặc bấm để chọn file từ máy</span><small>Tối đa 30 MB · 10 phút</small></button>
+        <div class="file-panel" id="filePanel" hidden><div class="file-summary"><span class="file-icon" aria-hidden="true">♫</span><div><strong id="fileName"></strong><small id="fileInfo"></small></div><button class="text-button" id="changeFile">Đổi file</button></div><canvas id="waveform" height="110" aria-label="Dạng sóng của file âm thanh"></canvas><div class="time-row"><span id="currentTime">00:00</span><span id="totalTime">00:00</span></div></div>
+        <div class="sample-row" id="sampleRow"><span>Chưa có file để thử?</span><button id="sampleButton" class="text-button">Dùng audio mẫu 10 giây ↗</button></div>
+        <div class="transport"><button id="startButton" class="primary-button" disabled><span aria-hidden="true">▶</span> Phát & dịch</button><button id="previewButton" class="secondary-button" disabled>Nghe bản gốc</button><button id="stopButton" class="stop-button" disabled aria-label="Dừng và bắt đầu lại">■ <span>Dừng</span></button></div>
+        <div class="mix"><div><label for="originalVolume">Âm lượng tiếng Anh <output id="originalValue">20%</output></label><input id="originalVolume" type="range" min="0" max="100" value="20"></div><div><label for="dubVolume">Âm lượng tiếng Việt <output id="dubValue">100%</output></label><input id="dubVolume" type="range" min="0" max="100" value="100"></div></div>
+      </section>
+
+      <section class="card live-card" aria-labelledby="liveHeading"><div class="card-heading"><h2 id="liveHeading"><span class="step">02</span> Bản dịch trực tiếp</h2><span class="status-tag" id="liveTag">SẴN SÀNG</span></div>
+        <div class="live-content"><div class="mini-label">ĐANG NGHE · TIẾNG ANH</div><p id="partialText" class="source-text">Lời nói tiếng Anh sẽ xuất hiện ở đây…</p><div class="translation-divider"></div><div class="mini-label green">LỒNG TIẾNG · TIẾNG VIỆT</div><p id="currentTranslation" class="translation-text">Kéo một file vào để bắt đầu.</p><div id="speakingBars" class="speaking-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span>VieNeu đang đọc bản dịch</span></div></div>
+        <div class="status-message" id="statusMessage" role="status" aria-live="polite">File được xử lý trên máy chạy ứng dụng. Audio không được lưu.</div>
+      </section>
+    </div>
+
+    <section class="metrics" aria-label="Thời gian xử lý P95"><div><span class="metric-title">Chờ đến lượt dịch <span title="Đoạn chữ chờ worker hoàn thành đoạn trước.">ⓘ</span></span><strong id="queueP95">—</strong><small>P95 · thời gian chờ</small></div><div><span class="metric-title">Dịch sang tiếng Việt</span><strong id="translationP95">—</strong><small>P95 · xử lý văn bản</small></div><div><span class="metric-title">VieNeu bắt đầu có tiếng</span><strong id="speechP95">—</strong><small>P95 · sau khi dịch xong</small></div><div class="metric-note"><span class="note-icon">◷</span><p>Bản dịch sẽ trễ hơn tiếng gốc.<br><small>P95: khoảng 95% lượt đo không lâu hơn số này.</small><small id="sampleCount">Chưa có lượt đo</small></p></div></section>
+
+    <section class="card transcript-card"><div class="card-heading"><h2><span class="step">03</span> Các đoạn đã dịch</h2><span id="segmentCount" class="small-label">0 đoạn</span></div><div class="transcript-labels"><span>TIẾNG ANH</span><span>TIẾNG VIỆT</span></div><div id="transcript" class="transcript"><div class="empty-transcript"><span aria-hidden="true">≋</span><p>Mỗi đoạn dịch sẽ được thêm vào đây khi bạn nghe.</p></div></div></section>
+    <footer><span><i></i> Qwen ASR <b>→</b> NLLB <b>→</b> VieNeu</span><span>Nghe · Hiểu · Kết nối</span></footer>
+  </main>
+</body>
+</html>

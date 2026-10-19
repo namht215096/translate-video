@@ -2,7 +2,9 @@
 
 Measured on 2026-10-12 using an NVIDIA GeForce RTX 4070 SUPER (12 GB),
 Python 3.12, PyTorch 2.9.1, Transformers 4.57.6, and VieNeu SDK 3.8.3.
-VieNeu is now the default backend; MMS remains selectable for comparison.
+The current pipeline uses VieNeu. MMS is the former model, retained only for
+reproducing this comparison. For a simple explanation of timing names, see
+[the timing guide](latency.md).
 
 ## Method
 
@@ -76,8 +78,8 @@ and playback. It is not an isolated TTS computation speed comparison.
 
 ## Interpretation and limits
 
-Choose VieNeu for incremental output and selectable Vietnamese voices. Choose
-MMS when minimizing total synthesis computation is the main requirement.
+VieNeu supports incremental output and selectable Vietnamese voices. In this
+comparison, the former MMS model needed less time to generate a complete sentence.
 The claim that VieNeu is simply faster than MMS is not supported by this test.
 
 These are small, single-machine measurements, without confidence intervals or

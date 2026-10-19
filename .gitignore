@@ -209,6 +209,7 @@ tempCodeRunnerFile.py
 .tools/
 output/
 examples/*.wav
+examples/*.mp3
 
 # Ruff stuff:
 .ruff_cache/

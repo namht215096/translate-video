@@ -89,7 +89,7 @@ def main():
     block(ax, 11.4, 3.49, 4.9, "Dịch sang tiếng Việt",
           ["NLLB-200 distilled 600M", "Chữ tiếng Anh → chữ tiếng Việt"], "#744ac4", "#f4efff")
     block(ax, 5.6, 3.49, 4.6, "Tạo giọng nói",
-          ["VieNeu v3 Turbo / MMS-TTS", "Chữ tiếng Việt → audio"], "#087e86", "#eaf8f6")
+          ["VieNeu-TTS v3 Turbo", "Chữ Việt → từng mẩu audio"], "#087e86", "#eaf8f6")
     block(ax, 0.8, 3.49, 3.6, "Phát ra loa",
           ["Nhận audio trong RAM", "Phát trực tiếp (--play)"], "#b46a0e", "#fff6e9")
     arrow(ax, (13.85, 5.92), (13.85, 5.04), "Lấy đoạn", (15.15, 5.45))

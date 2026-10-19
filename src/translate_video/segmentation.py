@@ -10,10 +10,13 @@ class Segmenter:
     reads of the same result. Once committed, speech cannot be revised.
     """
 
-    def __init__(self, max_words: int = 24):
+    def __init__(self, max_words: int = 24, holdback_words: int = 0):
         if max_words < 1:
             raise ValueError("max_words must be positive")
         self.max_words = max_words
+        if holdback_words < 0:
+            raise ValueError("holdback_words must be nonnegative")
+        self.holdback_words = holdback_words
         self.previous: list[str] = []
         self.committed: list[str] = []
 
@@ -31,6 +34,10 @@ class Segmenter:
                     break
                 stable += 1
         self.previous = words
+        if not final:
+            # Faster ASR updates may agree on a provisional sentence ending.
+            # Leave its tail editable until more speech arrives or finalization.
+            stable = min(stable, max(0, len(words) - self.holdback_words))
         emitted = []
         start = len(self.committed)
         while start < stable:

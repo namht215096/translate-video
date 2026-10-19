@@ -156,6 +156,34 @@ def test_empty_tts_stream_fails_without_hanging(tmp_path):
         ])
 
 
+def test_short_segments_are_emitted_before_end_of_unpunctuated_input(tmp_path):
+    class LongASR(ASR):
+        def feed(self, audio):
+            return "one two three four five six seven eight nine", True
+
+        def finish(self):
+            return "one two three four five six seven eight nine"
+
+    class IdentityTranslator:
+        def translate(self, text):
+            return text
+
+    pipeline = Pipeline(LongASR(), IdentityTranslator(), TTS(), tmp_path / "short",
+                        max_segment_words=8)
+
+    def chunks():
+        yield np.ones(1600, dtype=np.float32), .1
+        yield np.ones(1600, dtype=np.float32), .2
+        # The segment must be emitted before the generator ends/finalizes ASR.
+        assert pipeline.index == 1
+
+    pipeline.run(chunks())
+    events = [json.loads(line) for line in (tmp_path / "short/events.jsonl").read_text().splitlines()]
+    assert [event["source"] for event in events if event["type"] == "translation"] == [
+        "one two three four five six seven eight", "nine",
+    ]
+
+
 def test_silence_flush_and_window_reset(tmp_path):
     asr = ASR()
     Pipeline(asr, Translator(), TTS(), tmp_path / "run", silence_seconds=0.2).run([

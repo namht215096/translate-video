@@ -1,253 +1,139 @@
 # translate-video
 
-A Python prototype for streaming speech translation. The default direction is
-**English → Vietnamese**, using a fixed synthetic voice.
-
-See [CHANGELOG.md](CHANGELOG.md) for development changes and validation status.
+Translate English speech into spoken Vietnamese with Python.
+The current project uses **VieNeu-TTS-v3-Turbo** for speech output.
 
 ```text
-Microphone / audio-file replay (100 ms frames, 16 kHz mono)
-    → Qwen3-ASR-1.7B streaming through vLLM
-    → stable transcript segmentation + silence/window finalization
-    → NLLB-200 distilled 600M
-    → VieNeu-TTS-v3-Turbo streaming (or MMS-TTS baseline)
-    → optional direct speaker playback (audio stays in memory)
+Audio → Qwen ASR → English text → NLLB → Vietnamese text → VieNeu → Speaker
 ```
 
-This is an experiment, not a production dubbing service. It does not clone
-voices, synchronize video, separate speakers, or preserve background music.
-FastSpeech 2 and Nemotron are not implemented in this version. VieNeu emits
-48 kHz audio chunks through a single playback stream. MMS-TTS remains available
-as a 16 kHz, whole-waveform baseline.
+ASR listens while a second worker translates and reads each finished text segment.
+VieNeu sends small audio chunks to the speaker as they are generated.
+The project saves text and timing logs, but does not save audio.
 
-![Current architecture](docs/figures/architecture.png)
+![Architecture](docs/figures/architecture.png)
 
-The diagram is generated with Matplotlib. To regenerate the PNG and SVG:
+## Use the web interface
 
 ```bash
-.venv/bin/python -m pip install -e '.[plot]'
-.venv/bin/python scripts/draw_architecture.py
+.venv/bin/python -m pip install -e '.[web,vieneu]'
+./start-backend.sh
 ```
 
-## Installation
+The backend runs in the background. Use `./stop-backend.sh` to stop it.
+Logs are in `output/backend/backend.log`.
 
-Use Linux, Python **3.12**, an NVIDIA CUDA GPU, and sufficient disk space for
-PyTorch, vLLM, CUDA libraries, and model weights. A 12 GB GPU is the experiment's
-target, not a guaranteed minimum. Qwen's upstream package pins
-`transformers==4.57.6` and `vllm==0.14.0`; use an isolated environment.
-Triton also requires a C compiler and headers for your Python interpreter, even
-when CUDA graph capture is disabled.
+Open **http://127.0.0.1:8000**, drag an MP3 into the page, then click
+**Phát & dịch**. You can pause, stop, adjust each voice's volume, and read the
+English text and Vietnamese translation. The page shows **P95 latency**.
+
+The app processes a short part first, then starts both voices when Vietnamese
+audio is ready. It reads up to five seconds ahead in the file to reduce delay.
+This works for recorded files, not live microphone audio.
+
+The models run on this computer's GPU and load when the server starts. Wait
+for **Model đã sẵn sàng** before playing. Speech is translated as the file plays, with a delay;
+it is not synchronized dubbing. Audio stays in memory. See
+[the short web guide](docs/web.md).
+
+## Run the 10-second example
+
+On the configured project machine:
+
+```bash
+CC="$PWD/scripts/zig-cc" HF_HUB_OFFLINE=1 .venv/bin/translate-video \
+  --input examples/english_10s.wav --realtime --play \
+  --output "output/live-$(date +%Y%m%d-%H%M%S)"
+```
+
+- `CC`: use the project's Zig compiler wrapper.
+- `HF_HUB_OFFLINE=1`: use downloaded models. Remove this on the first run.
+- `--input`: the source audio file.
+- `--realtime`: read the file at its normal speed.
+- `--play`: hear the Vietnamese speech.
+- `--output`: a new folder for JSON logs, not audio files.
+
+Wait for the models to load. The command plays the translated Vietnamese speech.
+To hear the original English separately, run `pw-play examples/english_10s.wav`.
+
+To choose another VieNeu voice, add `--tts-voice 'Mai Anh'`.
+To use the microphone instead of a file, replace `--input ... --realtime` with
+`--mic`. Press Ctrl+C to finish. Microphone capture needs PortAudio and has not
+been tested on the project machine.
+
+## First-time setup
+
+Use Linux, Python 3.12, and an NVIDIA CUDA GPU. The project has been tested on
+an RTX 4070 SUPER with 12 GB VRAM.
 
 ```bash
 python3.12 -m venv .venv
 mkdir -p .cache/pip-tmp
-TMPDIR="$PWD/.cache/pip-tmp" .venv/bin/python -m pip install -e '.[dev,vieneu]'
-```
-
-The explicit temporary directory avoids filling a RAM-backed `/tmp` with large
-CUDA wheels. Ensure this directory and the model cache have enough disk space.
-
-If the machine has no system compiler, an optional local compiler is available:
-
-```bash
 TMPDIR="$PWD/.cache/pip-tmp" .venv/bin/python -m pip install -e '.[dev,compiler,vieneu]'
 export CC="$PWD/scripts/zig-cc"
 ```
 
-The compiler wrapper uses this checkout's `.venv`; keep that environment at the
-documented location. A normal GCC/Clang installation can be used instead.
+The temporary folder keeps large downloads off the RAM-backed `/tmp`.
+If GCC or Clang is installed, the optional Zig compiler is not required.
+Keep the project's PyTorch 2.9.1: installing `vieneu[cuda]` would request
+PyTorch 2.8.0 and conflict with vLLM.
 
-For the exact library versions used in the recorded Linux/Python 3.12 experiment,
-install `requirements-tested.txt` first, then install this project with
-`pip install --no-deps -e .`. The version snapshot includes the optional compiler.
-For VieNeu, also install `pip install -e '.[vieneu]'`. This installs the core SDK
-without its CUDA extra, preserving vLLM's PyTorch 2.9.1. The SDK's CUDA extra
-pins PyTorch 2.8.0 and conflicts with vLLM 0.14.0; do not install that extra into
-this environment. The core SDK's GPU backend was tested here with PyTorch 2.9.1.
-
-Microphone capture requires PortAudio. If importing `sounddevice`
-reports a missing library, install your distribution's PortAudio runtime
-(for example, `libportaudio2` on Ubuntu). Playback first uses `pw-play` (PipeWire)
-or `aplay` (ALSA) if available, and otherwise uses `sounddevice` with PortAudio.
-File replay with PipeWire playback works without PortAudio. Native players
-receive raw PCM on stdin; no intermediate audio files are written.
-
-## Try an audio file
-
-Download the public English audio used by Qwen's official streaming example:
+Download the public English example if no input file is available:
 
 ```bash
 mkdir -p examples
 curl -fL https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_en.wav \
   -o examples/asr_en.wav
-
-.venv/bin/translate-video \
-  --input examples/asr_en.wav \
-  --realtime \
-  --output output/english-to-vietnamese
 ```
 
-By default, a punctuation boundary must agree across consecutive ASR decode
-results, or stable text must reach 24 whitespace-separated words. This heuristic
-reduces revisions but does not guarantee semantic correctness. Add `--final-only`
-for conservative commits at silence/window finalization; this can delay the
-first audio until the entire window finishes.
+Then run the command above with `--input examples/asr_en.wav` and without
+`HF_HUB_OFFLINE=1`. This source file is about 15 seconds; the prepared
+`english_10s.wav` is a shorter excerpt.
 
-Add `--play` to hear the translated voice. Without it, the generated waveform is
-discarded after its text and timing metrics are recorded. Audio is never saved.
-Each run needs a new directory for JSON logs and configuration.
-The initial model download and loading time are excluded from processing metrics.
+Playback uses PipeWire (`pw-play`), ALSA (`aplay`), or PortAudio.
+On Ubuntu, microphone capture may need `libportaudio2`.
 
-For the prepared ten-second sample, play Vietnamese speech as segments become
-available:
+## Understand the timing numbers
+
+- **Translation queue:** how long a text segment waits for its turn. The worker
+  may still be reading the previous segment aloud.
+- **Translation time:** how long NLLB takes to translate that segment.
+- **First audio:** how long VieNeu takes to return its first audio chunk.
+- **Commit to audio ready:** from ASR finishing a text segment to receiving its
+  last audio chunk. This includes waiting in the text queue.
+
+For streaming, the first chunk can already be playing before the last chunk
+arrives. A long queue wait does not mean the translation model itself is slow.
+
+See [timing explained with an example](docs/latency.md).
+To summarize one run:
 
 ```bash
-CC="$PWD/scripts/zig-cc" HF_HUB_OFFLINE=1 \
-.venv/bin/translate-video \
-  --input examples/english_10s.wav \
-  --realtime --play \
-  --output "output/live-$(date +%Y%m%d-%H%M%S)"
+.venv/bin/python -m translate_video.report output/YOUR_RUN/events.jsonl
 ```
 
-Use this offline command after the models have been downloaded. `--realtime`
-paces input processing; `--play` plays the translated speech. The English source
-is not played simultaneously. Wait for model loading to finish before expecting
-speech. For an English preview, run `pw-play examples/english_10s.wav` separately.
+`events.jsonl` stores text and timings. `configuration.json` stores the run settings.
 
-For microphone input:
+## What has been tested
 
-```bash
-.venv/bin/translate-video --mic --play --output output/microphone
-```
+- 30 automated tests passed: `.venv/bin/python -m pytest`.
+- Real-time replay of the 10-second English sample completed with VieNeu playback.
+- The [TTS benchmark](docs/tts-benchmark.md) compares VieNeu with the former MMS model.
+  MMS is retained in code for reproducing that comparison; normal runs use VieNeu.
 
-Press Ctrl+C once to finalize pending speech and drain the workers. Avoid feeding
-speaker output back into the microphone; headphones are useful for this test.
-You can select an input device with `--mic-device`.
+This prototype does not yet synchronize video, clone speakers, or adjust speech
+speed to prevent delays. It waits for stable ASR text before translating, so
+spoken output is delayed. Long microphone sessions have not been validated.
 
-For a different direction, change all three language settings together and
-select a matching TTS checkpoint. For example, Vietnamese → English:
+## More information
 
-```bash
-.venv/bin/translate-video --input examples/vietnamese.wav \
-  --source-language Vietnamese --source-code vie_Latn --target-code eng_Latn \
-  --tts-backend mms --tts-model facebook/mms-tts-eng --realtime \
-  --output output/vietnamese-to-english
-```
+- [Timing guide](docs/latency.md)
+- [Benchmark results](docs/tts-benchmark.md)
+- [Earlier experiments](docs/experiment.md)
+- [Development history](docs/development-history.md)
+- [Changelog](CHANGELOG.md)
 
-## Outputs and metrics
-
-VieNeu is the default TTS backend. Use `--tts-backend mms` for the previous
-baseline, or `--tts-voice 'Mai Anh'` to choose a VieNeu preset. The resolved
-default voice in SDK 3.8.3 for this experiment was `Hải Đăng`.
-
-```bash
-CC="$PWD/scripts/zig-cc" HF_HUB_OFFLINE=1 .venv/bin/translate-video \
-  --input examples/english_10s.wav --realtime --play \
-  --tts-backend vieneu --output output/live-vieneu
-```
-
-The first run must have internet access to download VieNeu and its MOSS codec;
-omit `HF_HUB_OFFLINE=1` until those artifacts are cached. Choose a new output
-directory for each run.
-
-Each output directory contains:
-
-- `events.jsonl`: partial transcripts, translation text, stage timings, and a
-  final summary on successful completion.
-- `configuration.json`: command arguments, core library versions, and GPU name.
-
-The timings separate translation queue wait, translation inference, TTS
-inference, and blocking playback duration (`playback_ms`, when `--play` is used).
-`--output` selects a log directory; it does not save audio. There is no audio
-queue or audio-queue timing in new runs. `commit_to_audio_ready_ms` starts **after**
-segmentation: it excludes time spent listening and stabilizing ASR.
-`source_observed_end_seconds` is the audio cursor at commit, not a word timestamp.
-This version therefore does not report precise source-word-to-speaker latency.
-`audio_ready_elapsed_seconds` starts at input processing and records when a
-segment waveform is ready. The report includes this value for the first segment;
-it excludes model startup and does not represent delay for every source word.
-For VieNeu, `tts_first_chunk_ms` measures first-chunk availability, and
-`first_audio_ready_elapsed_seconds` is the corresponding input-relative time.
-`audio_ready_elapsed_seconds` means the final chunk has arrived.
-`tts_stream_elapsed_ms` spans generation through the last chunk and may include
-player backpressure. Streaming generation and `playback_ms` overlap; do not add
-them together. Isolated generation speed is measured by the benchmark below.
-`asr_call_ms` measures a decode-triggering call; it excludes earlier buffering.
-File replay without `--realtime` is a throughput experiment, not a live-latency
-measurement. The summary's wall time includes draining and playback, if enabled.
-
-Summarize median and p95 timings with:
-
-```bash
-.venv/bin/python -m translate_video.report output/english-to-vietnamese/events.jsonl
-```
-
-## Important behavior
-
-- RMS energy is a simple silence heuristic, not a trained VAD. Quiet speech can
-  be missed; noise can prevent silence detection. Adjust `--rms-threshold`.
-- Silence of 0.6 seconds finalizes a window. A window is also finalized after
-  12 seconds to bound Qwen's accumulating audio context. Forced boundaries can
-  split a sentence and reduce translation quality. The ASR context is capped at
-  1024 tokens to keep the single-stream configuration within the GPU budget;
-  substantially longer windows may exceed it.
-- Qwen partial text may change. If it revises an already committed prefix, the
-  run stops explicitly rather than duplicating or silently skipping speech.
-  Retry with `--final-only` or a longer `--chunk-seconds` value.
-- Translation uses each committed segment independently; it has no rolling
-  discourse context. Pronouns and incomplete clauses can translate poorly.
-- ASR runs independently of a single translation/TTS/playback worker, connected
-  by a bounded text queue. The worker translates, synthesizes, and plays one
-  segment completely before starting the next. There is no audio-output worker
-  or audio queue.
-  Microphone overflow or a full translation queue stops the run explicitly.
-  There is no automatic speech-rate adaptation: longer translations can still
-  accumulate playback delay.
-- MMS generates a full segment before playback. Streaming ASR does not make
-  this TTS implementation streaming.
-- VieNeu sends chunks to one PCM player per segment. The application has no
-  audio-output queue and saves no waveforms; the SDK scheduler and the audio
-  device still use their own internal buffers.
-- On failure, output files may contain a partial run. Preserve them for diagnosis
-  and choose another output directory before retrying.
-
-## Validation
-
-```bash
-.venv/bin/python -m pytest
-```
-
-Tests cover transcript revision, duplicate prevention, final flushing, bounded
-segments, worker failures, text queue draining, direct PCM playback, the absence
-of saved audio, report compatibility, and audio resampling. They use fake
-model adapters and do **not** prove model quality or GPU performance.
-
-See [the feasibility and evaluation notes](docs/feasibility.md) and
-[the experiment report](docs/experiment.md) for model decisions and actual
-validation results.
-
-See [the TTS speed comparison](docs/tts-benchmark.md) for matched-text GPU
-measurements. Reproduce it without playback or saved audio:
-
-```bash
-.venv/bin/python scripts/benchmark_tts.py --backend mms --output output/bench-mms.json
-.venv/bin/python scripts/benchmark_tts.py --backend vieneu --output output/bench-vieneu.json
-```
-
-Run the commands sequentially with other GPU inference stopped. Each command
-uses six identical texts, five repetitions per text, and three warmup requests.
-
-## Model references and licenses
-
-- [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR): streaming API and examples.
-- [NLLB-600M](https://huggingface.co/facebook/nllb-200-distilled-600M):
-  research model; CC-BY-NC-4.0; not released for production deployment.
-- [Vietnamese MMS-TTS](https://huggingface.co/facebook/mms-tts-vie):
-  Vietnamese VITS checkpoint; CC-BY-NC-4.0.
-- [VieNeu-TTS-v3-Turbo](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo):
-  Vietnamese/English streaming TTS; Apache-2.0.
-- [alVoCat Vocos](https://huggingface.co/projecte-aina/alvocat-vocos-22khz):
-  Catalan-trained vocoder; not used in this prototype.
-
-Model licenses are separate from application code. This stack is intended for
-non-commercial evaluation.
+Models: [Qwen ASR](https://github.com/QwenLM/Qwen3-ASR),
+[NLLB](https://huggingface.co/facebook/nllb-200-distilled-600M),
+[VieNeu](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo).
+NLLB uses a non-commercial license; this project is for non-commercial evaluation.

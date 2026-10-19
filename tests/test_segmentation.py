@@ -32,3 +32,16 @@ def test_long_punctuated_sentence_is_bounded():
     assert segmenter.update("one two three four five six seven.", final=True) == [
         "one two three", "four five six", "seven.",
     ]
+
+
+def test_provisional_sentence_ending_can_change_before_it_is_spoken():
+    segmenter = Segmenter(max_words=8, holdback_words=3)
+    prefix = "one two three four five six seven eight"
+    draft = prefix + " listening to him."
+    assert segmenter.update(draft) == []
+    assert segmenter.update(draft) == [prefix]
+    assert segmenter.update(draft) == []
+    corrected = prefix + " listening to him, but his solo"
+    assert segmenter.update(corrected) == []
+    assert segmenter.update(corrected) == ["listening to him,"]
+    assert segmenter.update(corrected, final=True) == ["but his solo"]

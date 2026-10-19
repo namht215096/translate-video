@@ -1,0 +1,31 @@
+{
+  "input": "examples/ENG_US_M_DaveL.mp3 (19.898 seconds)",
+  "runs": [
+    {
+      "first_scheduled_audio_ms": 927.3999999994412,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 821.7999999998136,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 813.2000000001864,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 786.6000000005589,
+      "completed_full_file": false
+    },
+    {
+      "first_scheduled_audio_ms": 776.4000000003726,
+      "completed_full_file": true
+    }
+  ],
+  "p95_button_to_first_scheduled_audio_ms": 927.3999999994412,
+  "conditions": "Models preloaded and warmed; 0.5-second ASR updates; 8-word stable segments; real GPU inference; Chromium browser, no playback pauses. Browser scheduling time, not physical speaker latency. Only five runs. First four stop after first audio; fifth verifies complete playback. Three trailing words remain provisional until more speech arrives. MP3 read-ahead enabled. Not live microphone latency.",
+  "browser_errors": [],
+  "read_ahead_seconds": 5,
+  "max_unprocessed_input_seconds": 4,
+  "original_playback": "Starts with first Vietnamese chunk; falls back to original after 2 seconds if needed; never truncated when server finishes early."
+}
